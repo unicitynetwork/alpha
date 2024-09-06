@@ -6,9 +6,11 @@ Alphacash
 
 Alphacash is designed to be the native currency of Unicity, a massvie online multi-player immersive simulation game engine. As a standalone digital currency it has some valuable properties:
 
-1. genuine decentralization: zero-premine with ASIC resitant hash function
+1. genuine decentralization: zero-premine with ASIC resistant hash function
 2. massively parallel client side execution of smart contracts
 3. perfect privacy 
+
+
 
 
 The design is a layered architecture 
@@ -17,7 +19,10 @@ The design is a layered architecture
 						Uncity and ZK Aggregation
 						Smart Contracts
 
-This codebase implements the top layer and uses a fork of Bitcoin (Scash). It is not designed to be a transaction system and 99.9% of the codebase is redundant - transactions should be executed at the smart contract layer not in the Proof of Work layer. Transactions are still needed (coinbase, mining pools) but discouraged. 
+
+The top layer provides a Proof of Work trust anchor i.e. it mints new coins which can then be extracted and used "off-chain" in the Smart Contract layer.
+
+This codebase implements the top layer and uses a fork of Bitcoin (Scash). It is not designed to be a transaction system and 99% of the codebase is redundant - transactions are executed at the smart contract layer not in the Proof of Work layer. Transactions are still needed (coinbase, mining pools) but discouraged. 
 
 The major changes from the Bitcoin codebase
 
@@ -28,13 +33,18 @@ The major changes from the Bitcoin codebase
 
 This ensures local verifability i.e. each coin sub-ledger can be extracted from the ledger and used off-chain in the smart contract layer.
 
-**RandomX Hash Function **
+**RandomX Hash Function**
+
 To achieve genuine decentralization we use an ASIC resistance hash function called RandomX similar to Monero https://github.com/tevador/RandomX 
 Nodes will automatically switch over from SHA256D on block 200,000
 
 
-**ASERT and 2 minute block time **
-the Bitcoin Cash implementation of an exponential moving average approach to difficulty adjustments is implemented to theoretically always target a correction toward a 2 minute block time. A half-life of one hour is used.
+**ASERT and 2 minute block time**
+
+The Bitcoin Cash implementation of an exponential moving average approach to difficulty adjustments is implemented to theoretically always target a correction toward a 2 minute block time. A half-life of one hour is used i.e. If the hashing power increases/decreases dramatically the difficuly will double/half every hour until the block time adjusts back to 2 mins.
+
+
+Bitcoin Core is released under the terms of the MIT license.
 
 
 
