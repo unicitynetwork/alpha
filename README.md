@@ -16,7 +16,7 @@ Alphacash is designed to be the native currency of Unicity, a massvie online mul
 The design is a layered architecture 
 			
 						Proof of Work Trust Anchor
-						Uncity and ZK Aggregation
+						Unicity and ZK Aggregation
 						Smart Contracts
 
 
