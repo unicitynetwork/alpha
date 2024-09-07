@@ -185,7 +185,7 @@ void sanity_check_chainparams(const ArgsManager& args, ChainType chain_type)
     // check max target * 4*nPowTargetTimespan doesn't overflow -- see pow.cpp:CalculateNextWorkRequired()
 
     // !ALPHA 
-    if (g_isRandomX && !consensus.fPowNoRetargeting) {
+    if (g_isAlpha && !consensus.fPowNoRetargeting) {
         arith_uint512 targ_max_512("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
         targ_max_512 /= consensus.nPowTargetTimespan*4;
         arith_uint512 powLimit_512 = arith_uint512::from(UintToArith256(consensus.powLimit));
@@ -222,23 +222,23 @@ BOOST_AUTO_TEST_CASE(ChainParams_SIGNET_sanity)
 // !ALPHA
 BOOST_AUTO_TEST_CASE(ChainParams_ALPHAREGTEST_sanity)
 {
-    g_isRandomX = true;
+    g_isAlpha= true;
     sanity_check_chainparams(*m_node.args, ChainType::ALPHAREGTEST);
-    g_isRandomX = false;
+    g_isAlpha = false;
 }
 
 BOOST_AUTO_TEST_CASE(ChainParams_ALPHATESTNET_sanity)
 {
-    g_isRandomX = true;
+    g_isAlpha = true;
     sanity_check_chainparams(*m_node.args, ChainType::ALPHATESTNET);
-    g_isRandomX = false;
+    g_isAlpha = false;
 }
 
 BOOST_AUTO_TEST_CASE(ChainParams_ALPHAMAIN_sanity)
 {
-    g_isRandomX = true;
+    g_isAlpha = true;
     sanity_check_chainparams(*m_node.args, ChainType::ALPHAMAIN);
-    g_isRandomX = false;
+    g_isAlpha = false;
 }
 
 BOOST_AUTO_TEST_CASE(Check_Epoch_Calculation)
@@ -273,11 +273,11 @@ BOOST_AUTO_TEST_CASE(Check_RandomX_BlockHeader)
     const auto consensus = chainParams->GetConsensus();
 
     // Sanity check: block header GetHash() function includes RandomX field when running as Scash
-    assert(!g_isRandomX);
+    assert(!g_isAlpha);
     BOOST_CHECK_NE(consensus.hashGenesisBlock, chainParams->GenesisBlock().GetHash());
-    g_isRandomX = true;
+    g_isAlpha = true;
     BOOST_CHECK_EQUAL(consensus.hashGenesisBlock, chainParams->GenesisBlock().GetHash());
-    g_isRandomX = false;
+    g_isAlpha = false;
 
     // CheckProofOfWorkRandomX() checks if commitment (computed from block header) meets targett
     CBlockHeader block = chainParams->GenesisBlock().GetBlockHeader();
@@ -969,9 +969,9 @@ BOOST_AUTO_TEST_CASE(asert_activation_anchor_alpha_test) {
     // Verify that under legacy DAA, block 4032 wuold not change difficulty, since blocks mined on schedule.
     BOOST_CHECK(bidx == 4032);
     CBlockIndex *pindexPreActivation = blocks[bidx-1].get();
-    g_isRandomX = 1; // fixes off by 1
+    g_isAlpha = 1; // fixes off by 1
     BOOST_CHECK_EQUAL(GetNextWorkRequired(pindexPreActivation, &blkHeaderDummy, params), initialBits);
-    g_isRandomX = 0;
+    g_isAlpha = 0;
 
     // Activate Asert DAA at block 4032, using block 1 as anchor and genesis block timestamp
     params.nASERTActivationHeight = 4032;
