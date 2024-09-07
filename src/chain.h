@@ -436,13 +436,19 @@ public:
         READWRITE(obj.nTime);
         READWRITE(obj.nBits);
         READWRITE(obj.nNonce);
-        // !SCASH ALPHA TODO can this be safely removed - answer no !
+        // !SCASH 
 //        if (g_isRandomX) {
 //        if(obj.nVersion > 1){
-        if ((obj.nVersion & (1 << 15)) != 0){
+//        if ((obj.nVersion & (1 << g_Rx_versionbit)) != 0){
+//            READWRITE(obj.hashRandomX);
+//        }
+        // !SCASH END
+        
+        // !ALPHA
+        if ((obj.nVersion & (1 << g_Rx_versionbit)) != 0){
             READWRITE(obj.hashRandomX);
         }
-        // !SCASH END
+        // !ALPHA END
     }
 
     uint256 ConstructBlockHash() const

@@ -1,5 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2022 The Bitcoin Core developers
+// Copyright (c) 2024 Makoto Sakuyama
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -130,10 +131,10 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
 
 // !ALPHA
     int RandomXHeight = chainparams.GetConsensus().RandomXHeight;
-    int RandomXbit = chainparams.GetConsensus().RandomX_version_bit;
-    if (chainparams.GetConsensus().fPowRandomX && nHeight >= RandomXHeight)
+
+    if (g_isAlpha && nHeight >= RandomXHeight)
     {
-        pblock->nVersion |= (1 << RandomXbit);
+        pblock->nVersion |= (1 << g_Rx_versionbit);
     }
 // !ALPHA END
     
@@ -175,6 +176,8 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
     // Fill in header
     pblock->hashPrevBlock  = pindexPrev->GetBlockHash();
     UpdateTime(pblock, chainparams.GetConsensus(), pindexPrev);
+    
+
     pblock->nBits          = GetNextWorkRequired(pindexPrev, pblock, chainparams.GetConsensus());
     pblock->nNonce         = 0;
     pblocktemplate->vTxSigOpsCost[0] = WITNESS_SCALE_FACTOR * GetLegacySigOpCount(*pblock->vtx[0]);

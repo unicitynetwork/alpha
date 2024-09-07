@@ -14,8 +14,8 @@
 #include <util/time.h>
 
 // !ALPHA
-extern bool g_isAlphaChain;
-extern bool g_isRandomX;
+extern bool g_isAlpha;
+//extern bool g_isRandomX;
 extern bool g_isIBDFinished;
 const bool g_Rx_versionbit = 15;
 // !ALPHA END
@@ -48,16 +48,17 @@ public:
 
     SERIALIZE_METHODS(CBlockHeader, obj) { 
         READWRITE(obj.nVersion, obj.hashPrevBlock, obj.hashMerkleRoot, obj.nTime, obj.nBits, obj.nNonce);
+        
         // !SCASH
 //        if (g_isRandomX) {
 //            READWRITE(obj.hashRandomX);
 //        }
         // !SCASH END
         
-//        if ((obj.nVersion & (1 << 15)) != 0)
-//        if (obj.nVersion >1)
-        if ((obj.nVersion & (1 << 15)) != 0)
+        // !ALPHA
+        if ((obj.nVersion & (1 << g_Rx_versionbit)) != 0)
             READWRITE(obj.hashRandomX);
+        // !ALPHA END
     }
 
     void SetNull()

@@ -1,6 +1,7 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2009-2021 The Bitcoin Core developers
 // Copyright (c) 2024 The Scash developers
+// Copyright (c) 2024 Makoto Sakuyama
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -27,6 +28,8 @@
 #include <cstring>
 #include <type_traits>
 
+
+
 static CBlock CreateGenesisBlock(const char* pszTimestamp, const CScript& genesisOutputScript, uint32_t nTime, uint32_t nNonce, uint32_t nBits, int32_t nVersion, const CAmount& genesisReward)
 {
     CMutableTransaction txNew;
@@ -48,23 +51,408 @@ static CBlock CreateGenesisBlock(const char* pszTimestamp, const CScript& genesi
     return genesis;
 }
 
-/**
- * Build the genesis block. Note that the output of its generation
- * transaction cannot be spent since it did not originally exist in the
- * database.
- *
- * CBlock(hash=000000000019d6, ver=1, hashPrevBlock=00000000000000, hashMerkleRoot=4a5e1e, nTime=1231006505, nBits=1d00ffff, nNonce=2083236893, vtx=1)
- *   CTransaction(hash=4a5e1e, ver=1, vin.size=1, vout.size=1, nLockTime=0)
- *     CTxIn(COutPoint(000000, -1), coinbase 04ffff001d0104455468652054696d65732030332f4a616e2f32303039204368616e63656c6c6f72206f6e206272696e6b206f66207365636f6e64206261696c6f757420666f722062616e6b73)
- *     CTxOut(nValue=50.00000000, scriptPubKey=0x5F1DF16B2B704C8A578D0B)
- *   vMerkleTree: 4a5e1e
- */
+
 static CBlock CreateGenesisBlock(uint32_t nTime, uint32_t nNonce, uint32_t nBits, int32_t nVersion, const CAmount& genesisReward)
 {
     const char* pszTimestamp = "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks";
     const CScript genesisOutputScript = CScript() << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5f") << OP_CHECKSIG;
     return CreateGenesisBlock(pszTimestamp, genesisOutputScript, nTime, nNonce, nBits, nVersion, genesisReward);
 }
+
+
+
+// !ALPHA
+
+static CBlock CreateAlphaGenesisBlock(uint32_t nTime, uint32_t nNonce, uint32_t nBits, int32_t nVersion, const CAmount& genesisReward)
+{
+    const char* pszTimestamp = "Financial Times 25/May/2024 What went wrong with capitalism";
+    const CScript genesisOutputScript = CScript() << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5f") << OP_CHECKSIG;
+    return CreateGenesisBlock(pszTimestamp, genesisOutputScript, nTime, nNonce, nBits, nVersion, genesisReward);
+}
+
+
+// ALPHA MainNet
+class CAlphaMainParams : public CChainParams {
+public:
+    CAlphaMainParams() {
+        m_chain_type = ChainType::ALPHAMAIN;
+        consensus.signet_blocks = false;
+        consensus.signet_challenge.clear();
+        consensus.nSubsidyHalvingInterval = 210000*5;  // keep the same halving time as BTC (5x the number of blocks)
+        consensus.BIP34Height = 100000; // Always active unless overridden
+        consensus.BIP34Hash = uint256();
+        consensus.BIP65Height = 100000;  // Always active unless overridden
+        consensus.BIP66Height = 100000;  // Always active unless overridden
+        consensus.CSVHeight = 100000;    // Always active unless overridden
+        consensus.SegwitHeight = 100000; // Always active unless overridden
+        consensus.MinBIP9WarningHeight = 0;
+ //       consensus.powLimit = uint256S("00000fffff000000000000000000000000000000000000000000000000000000");
+        consensus.powLimit = uint256S("000fffff00000000000000000000000000000000000000000000000000000000");
+        
+        consensus.nPowTargetTimespan = 14 * 24 * 60 * 60 /5 ; // two weeks /5
+        consensus.nPowTargetSpacing = 2 * 60;   //two minutes
+        consensus.fPowAllowMinDifficultyBlocks = false;
+        consensus.fPowNoRetargeting = false;
+        consensus.nRuleChangeActivationThreshold = 1815; // 90% of 2016
+        consensus.nMinerConfirmationWindow = 2016; // nPowTargetTimespan / nPowTargetSpacing
+        
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = Consensus::BIP9Deployment::NEVER_ACTIVE;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].min_activation_height = 0; // No activation delay
+
+        // Deployment of Taproot (BIPs 340-342)
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].bit = 2;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nStartTime = Consensus::BIP9Deployment::ALWAYS_ACTIVE;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].min_activation_height = 0; // No activation delay
+
+        consensus.nMinimumChainWork = uint256{};
+        consensus.defaultAssumeValid = uint256{};
+        
+        /**
+         * The message start string is designed to be unlikely to occur in normal data.
+         * The characters are rarely used upper ASCII, not valid as UTF-8, and produce
+         * a large 32-bit integer with any alignment.
+         */
+        pchMessageStart[0] = 0xd9;
+        pchMessageStart[1] = 0xb4;
+        pchMessageStart[2] = 0xbe;
+        pchMessageStart[3] = 0xf9;
+        nDefaultPort = 8590;
+        nPruneAfterHeight = 100000;
+        m_assumed_blockchain_size = 0;
+        m_assumed_chain_state_size = 0;
+
+        // The half life for the ASERT DAA. For every (nASERTHalfLife) seconds behind schedule the blockchain gets,
+        // difficulty is cut in half. Doubled if blocks are ahead of schedule.
+        // Two days
+
+        consensus.nASERTHalfLife = 30 * 60;  //30 minutes half life
+        consensus.nASERTActivationHeight = 10;
+        consensus.asertAnchorParams = Consensus::Params::ASERTAnchor{
+            68718,        // anchor block height
+            0x1e1d7cb5,   // anchor block nBits
+            1725725954,   // anchor block previous block timestamp
+        };
+
+
+        consensus.fAlphaEnabled = true;
+        consensus.nRandomXEpochDuration = 7 * 24 * 60 * 60;     // one week
+        
+        //height at which RandomX hashing starts
+        consensus.RandomXHeight = 68718;
+        
+        //Multipler when SHA256D switches to RandomX;
+        consensus.RandomX_DiffMult = 100000;
+        
+        genesis = CreateAlphaGenesisBlock(1718524492, 40358186, 0x1d0fffff, 1, 10 * COIN);
+        
+        consensus.hashGenesisBlock = genesis.GetHash();
+        
+        assert(consensus.hashGenesisBlock == uint256S("0x0000000cd159482c9663a50e6a23a63155f9477384843473b784449b897569bf"));
+        assert(genesis.hashMerkleRoot == uint256S("0xc61f9003735f01c77c4a8b3554b86b8bda7ce1f3854f1e657abfad6f49462614"));
+            
+        vFixedSeeds = std::vector<uint8_t>(std::begin(chainparams_seed_main_alpha), std::end(chainparams_seed_main_alpha));
+        vSeeds.clear();
+
+
+        fDefaultConsistencyChecks = false;
+        m_is_mockable_chain = false;
+
+       
+        
+        checkpointData = {
+            {
+                  { 10000, uint256S("0x00000006de7ea8bbc408e0b0d92aca299182df06720bf6d0f2551ebdc001752f")},
+                  { 50000, uint256S("0x000000003bcc759fd72afe7349581dc724845841a4fa0db85c3283136f22858a")},
+                  { 60000, uint256S("0x000000002506435a08bf9b2470533527983ff2ec43810b92153a1b49c571d375")},
+            }
+        };
+
+        m_assumeutxo_data = {
+        };
+
+        chainTxData = ChainTxData{
+            0,
+            0,
+            0
+        };
+        
+        base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,0);
+        base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1,5);
+        base58Prefixes[SECRET_KEY] =     std::vector<unsigned char>(1,128);
+        base58Prefixes[EXT_PUBLIC_KEY] = {0x04, 0x88, 0xB2, 0x1E};
+        base58Prefixes[EXT_SECRET_KEY] = {0x04, 0x88, 0xAD, 0xE4};
+
+        bech32_hrp = "alpha";
+    }
+};
+
+/**
+ * Testnet: public test network which is reset from time to time.
+ */
+class CAlphaTestNetParams : public CChainParams {
+public:
+    CAlphaTestNetParams() {
+        m_chain_type = ChainType::ALPHATESTNET;
+        consensus.signet_blocks = false;
+        consensus.signet_challenge.clear();
+        consensus.nSubsidyHalvingInterval = 210000*5;
+        consensus.BIP34Height = 1; // Always active unless overridden
+        consensus.BIP34Hash = uint256();
+        consensus.BIP65Height = 1;  // Always active unless overridden
+        consensus.BIP66Height = 1;  // Always active unless overridden
+        consensus.CSVHeight = 1;    // Always active unless overridden
+        consensus.SegwitHeight = 0; // Always active unless overridden
+        consensus.MinBIP9WarningHeight = 0;
+        consensus.powLimit = uint256S("00007fffff000000000000000000000000000000000000000000000000000000");
+        consensus.nPowTargetTimespan = 14 * 24 * 60 * 60 / 5; // two weeks
+        consensus.nPowTargetSpacing = 2 * 60;
+        consensus.fPowAllowMinDifficultyBlocks = true;
+        consensus.fPowNoRetargeting = false;
+        consensus.nRuleChangeActivationThreshold = 1512; // 75% for testchains
+        consensus.nMinerConfirmationWindow = 2016; // nPowTargetTimespan / nPowTargetSpacing
+
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = Consensus::BIP9Deployment::NEVER_ACTIVE;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].min_activation_height = 0; // No activation delay
+
+        // Deployment of Taproot (BIPs 340-342)
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].bit = 2;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nStartTime = Consensus::BIP9Deployment::ALWAYS_ACTIVE;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].min_activation_height = 0; // No activation delay
+
+        consensus.nMinimumChainWork = uint256{};
+        consensus.defaultAssumeValid = uint256{};
+
+        // The half life for the ASERT DAA. For every (nASERTHalfLife) seconds behind schedule the blockchain gets,
+        // difficulty is cut in half. Doubled if blocks are ahead of schedule.
+        // Two days
+/*
+        consensus.nASERTHalfLife = 30 * 60;
+        consensus.nASERTActivationHeight = 301;
+        consensus.asertAnchorParams = Consensus::Params::ASERTAnchor{
+            280,          // anchor block height
+            0x1e7fffff,   // anchor block nBits
+            1714191827,   // anchor block previous block timestamp
+        };
+*/
+        pchMessageStart[0] = 0x0d;
+        pchMessageStart[1] = 0x12;
+        pchMessageStart[2] = 0x0a;
+        pchMessageStart[3] = 0x09;
+        nDefaultPort = 18592;
+        nPruneAfterHeight = 1000;
+        m_assumed_blockchain_size = 0;
+        m_assumed_chain_state_size = 0;
+
+        consensus.fAlphaEnabled = true;
+        consensus.nRandomXEpochDuration = 7 * 24 * 60 * 60;     // one week
+        genesis = CreateAlphaGenesisBlock(1296688602, 6107, 0x1e7fffff, 1, 10 * COIN);
+//      genesis.hashRandomX = uint256S("e848dddfb604a4b1783c8a38b6db5179ccd6911331f2be18bfec02522d95af86");
+        consensus.hashGenesisBlock = genesis.GetHash();
+//      assert(consensus.hashGenesisBlock == uint256S("0x6ed227489a38c8e66c6c41ad947998c8594d2708454630fd8df45cbc93b4aebb"));
+//      assert(genesis.hashMerkleRoot == uint256S("4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b"));
+
+        vFixedSeeds.clear();
+        vSeeds.clear();
+
+        base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,111);
+        base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1,196);
+        base58Prefixes[SECRET_KEY] =     std::vector<unsigned char>(1,239);
+        base58Prefixes[EXT_PUBLIC_KEY] = {0x04, 0x35, 0x87, 0xCF};
+        base58Prefixes[EXT_SECRET_KEY] = {0x04, 0x35, 0x83, 0x94};
+
+        bech32_hrp = "talpha";
+
+        fDefaultConsistencyChecks = false;
+        m_is_mockable_chain = false;
+
+        checkpointData = {
+        };
+
+        m_assumeutxo_data = {
+        };
+
+        chainTxData = ChainTxData{
+            0,
+            0,
+            0
+        };
+    }
+};
+
+/**
+ * Regression test: intended for private networks only. Has minimal difficulty to ensure that
+ * blocks can be found instantly.
+ */
+class CAlphaRegTestParams : public CChainParams
+{
+public:
+    explicit CAlphaRegTestParams(const RegTestOptions& opts)
+    {
+        m_chain_type = ChainType::ALPHAREGTEST;
+        consensus.signet_blocks = false;
+        consensus.signet_challenge.clear();
+        consensus.nSubsidyHalvingInterval = 2000;
+        consensus.BIP34Height = 10;
+        consensus.BIP34Hash = uint256();
+        consensus.BIP65Height = 10;  // Always active unless overridden
+        consensus.BIP66Height = 10;  // Always active unless overridden
+        consensus.CSVHeight = 10;    // Always active unless overridden
+        consensus.SegwitHeight = 10; // Always active unless overridden
+        consensus.MinBIP9WarningHeight = 0;
+        consensus.powLimit = uint256S("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+        consensus.nPowTargetTimespan = 14 * 24 * 60 * 60 / 5; // two weeks
+        consensus.nPowTargetSpacing = 2 * 60;
+        consensus.fPowAllowMinDifficultyBlocks = false;
+        consensus.fPowNoRetargeting = false;
+        consensus.nRuleChangeActivationThreshold = 108; // 75% for testchains
+        consensus.nMinerConfirmationWindow = 144; // Faster than normal for regtest (144 instead of 2016)
+
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = 0;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].min_activation_height = 0; // No activation delay
+
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].bit = 2;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nStartTime = Consensus::BIP9Deployment::ALWAYS_ACTIVE;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].min_activation_height = 0; // No activation delay
+        
+
+        consensus.nMinimumChainWork = uint256{};
+        consensus.defaultAssumeValid = uint256{};
+
+        
+        //TODO
+        pchMessageStart[0] = 0xc9;
+        pchMessageStart[1] = 0xa4;
+        pchMessageStart[2] = 0xae;
+        pchMessageStart[3] = 0xe9;
+        nDefaultPort = 18589;
+        nPruneAfterHeight = opts.fastprune ? 100 : 1000;
+        m_assumed_blockchain_size = 0;
+        m_assumed_chain_state_size = 0;
+
+
+        consensus.nASERTHalfLife = 2 * 24 * 60 * 60;
+        consensus.nASERTHalfLife = 60*60;
+        consensus.nASERTActivationHeight = 5;
+        consensus.asertAnchorParams = Consensus::Params::ASERTAnchor{
+              1,        // anchor block height
+              0x1e0fffff,   // anchor block nBits
+              1725709669,   // anchor block previous block timestamp
+        };
+
+        
+        consensus.fAlphaEnabled = true;
+        consensus.nRandomXEpochDuration = 24 * 60 * 60;     // one day
+        
+        //height at which RandomX  starts
+        consensus.RandomXHeight = 100;
+        
+        //Difficulty is divided by this amount when RandomX blocks start
+        consensus.RandomX_DiffMult = 1000;
+
+        genesis = CreateAlphaGenesisBlock(1718524492, 672420, 0x1e0fffff, 1, 10 * COIN);
+
+
+        for (const auto& [dep, height] : opts.activation_heights) {
+            switch (dep) {
+            case Consensus::BuriedDeployment::DEPLOYMENT_SEGWIT:
+                consensus.SegwitHeight = int{height};
+                break;
+            case Consensus::BuriedDeployment::DEPLOYMENT_HEIGHTINCB:
+                consensus.BIP34Height = int{height};
+                break;
+            case Consensus::BuriedDeployment::DEPLOYMENT_DERSIG:
+                consensus.BIP66Height = int{height};
+                break;
+            case Consensus::BuriedDeployment::DEPLOYMENT_CLTV:
+                consensus.BIP65Height = int{height};
+                break;
+            case Consensus::BuriedDeployment::DEPLOYMENT_CSV:
+                consensus.CSVHeight = int{height};
+                break;
+            }
+        }
+
+        for (const auto& [deployment_pos, version_bits_params] : opts.version_bits_parameters) {
+            consensus.vDeployments[deployment_pos].nStartTime = version_bits_params.start_time;
+            consensus.vDeployments[deployment_pos].nTimeout = version_bits_params.timeout;
+            consensus.vDeployments[deployment_pos].min_activation_height = version_bits_params.min_activation_height;
+        }
+
+
+//        genesis = CreateAlphaGenesisBlock(1718524492, 2, 0x207fffff, 1, 10 * COIN);
+//        genesis = CreateAlphaGenesisBlock(1718524492, 40358186, 0x1d0fffff, 1, 10 * COIN);
+//        genesis.hashRandomX = uint256S("0x177a9deba97f0dae00a6bf55e03671ec6bce7051d6a5054db49237598b803f93");
+   
+        consensus.hashGenesisBlock = genesis.GetHash();
+//        assert(consensus.hashGenesisBlock == uint256S("0x6ed227489a38c8e66c6c41ad947998c8594d2708454630fd8df45cbc93b4aebb"));
+        
+        assert(consensus.hashGenesisBlock == uint256S("0000054a175a384631d1d82709f6341c69f2a3a81fa802e8f1846ba4ab447a98"));
+        assert(genesis.hashMerkleRoot == uint256S("0xc61f9003735f01c77c4a8b3554b86b8bda7ce1f3854f1e657abfad6f49462614"));
+        
+        
+ //       consensus.hashGenesisBlock = genesis.GetHash();
+ //       assert(consensus.hashGenesisBlock == uint256S("0x0000000cd159482c9663a50e6a23a63155f9477384843473b784449b897569bf"));
+ //       assert(genesis.hashMerkleRoot == uint256S("0xc61f9003735f01c77c4a8b3554b86b8bda7ce1f3854f1e657abfad6f49462614"));
+
+        vFixedSeeds.clear(); //!< Regtest mode doesn't have any fixed seeds.
+        vSeeds.clear();
+        vSeeds.emplace_back("dummySeed.invalid.");
+
+        fDefaultConsistencyChecks = true;
+        m_is_mockable_chain = true;
+
+        checkpointData = {
+        };
+
+        m_assumeutxo_data = {
+        };
+
+        chainTxData = ChainTxData{
+            0,
+            0,
+            0
+        };
+
+        base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,111);
+        base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1,196);
+        base58Prefixes[SECRET_KEY] =     std::vector<unsigned char>(1,239);
+        base58Prefixes[EXT_PUBLIC_KEY] = {0x04, 0x35, 0x87, 0xCF};
+        base58Prefixes[EXT_SECRET_KEY] = {0x04, 0x35, 0x83, 0x94};
+
+        bech32_hrp = "ralpha";
+    }
+};
+
+std::unique_ptr<const CChainParams> CChainParams::AlphaRegTest(const RegTestOptions& options)
+{
+    return std::make_unique<const CAlphaRegTestParams>(options);
+}
+
+std::unique_ptr<const CChainParams> CChainParams::AlphaTestNet()
+{
+    return std::make_unique<const CAlphaTestNetParams>();
+}
+
+std::unique_ptr<const CChainParams> CChainParams::AlphaMain()
+{
+    return std::make_unique<const CAlphaMainParams>();
+}
+
+// !ALPHA END
+
+
+
+
+
 
 /**
  * Main network on which people trade goods and services.
@@ -888,413 +1276,3 @@ std::unique_ptr<const CChainParams> CChainParams::ScashMain()
 */
 
 
-// !ALPHA
-
-static CBlock CreateAlphaGenesisBlock(uint32_t nTime, uint32_t nNonce, uint32_t nBits, int32_t nVersion, const CAmount& genesisReward)
-{
-    const char* pszTimestamp = "Financial Times 25/May/2024 What went wrong with capitalism";
-    const CScript genesisOutputScript = CScript() << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5f") << OP_CHECKSIG;
-    return CreateGenesisBlock(pszTimestamp, genesisOutputScript, nTime, nNonce, nBits, nVersion, genesisReward);
-}
-
-
-/**
- * Main network on which people trade goods and services.
- */
-class CAlphaMainParams : public CChainParams {
-public:
-    CAlphaMainParams() {
-        m_chain_type = ChainType::ALPHAMAIN;
-        consensus.signet_blocks = false;
-        consensus.signet_challenge.clear();
-        consensus.nSubsidyHalvingInterval = 210000*5;  // keep the same halving time as BTC (5x the number of blocks)
-        consensus.BIP34Height = 100000; // Always active unless overridden
-        consensus.BIP34Hash = uint256();
-        consensus.BIP65Height = 100000;  // Always active unless overridden
-        consensus.BIP66Height = 100000;  // Always active unless overridden
-        consensus.CSVHeight = 100000;    // Always active unless overridden
-        consensus.SegwitHeight = 100000; // Always active unless overridden
-        consensus.MinBIP9WarningHeight = 0;
-        consensus.powLimit = uint256S("00000fffff000000000000000000000000000000000000000000000000000000");
-        consensus.nPowTargetTimespan = 14 * 24 * 60 * 60 /5 ; // two weeks /5
-        consensus.nPowTargetSpacing = 2 * 60;   //two minutes
-        consensus.fPowAllowMinDifficultyBlocks = false;
-        consensus.fPowNoRetargeting = false;
-        consensus.nRuleChangeActivationThreshold = 1815; // 90% of 2016
-        consensus.nMinerConfirmationWindow = 2016; // nPowTargetTimespan / nPowTargetSpacing
-        
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = Consensus::BIP9Deployment::NEVER_ACTIVE;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].min_activation_height = 0; // No activation delay
-
-        // Deployment of Taproot (BIPs 340-342)
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].bit = 2;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nStartTime = Consensus::BIP9Deployment::ALWAYS_ACTIVE;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].min_activation_height = 0; // No activation delay
-
-        consensus.nMinimumChainWork = uint256{};
-        consensus.defaultAssumeValid = uint256{};
-        
-        /**
-         * The message start string is designed to be unlikely to occur in normal data.
-         * The characters are rarely used upper ASCII, not valid as UTF-8, and produce
-         * a large 32-bit integer with any alignment.
-         */
-        pchMessageStart[0] = 0xd9;
-        pchMessageStart[1] = 0xb4;
-        pchMessageStart[2] = 0xbe;
-        pchMessageStart[3] = 0xf9;
-        nDefaultPort = 8590;
-        nPruneAfterHeight = 100000;
-        m_assumed_blockchain_size = 0;
-        m_assumed_chain_state_size = 0;
-
-        // The half life for the ASERT DAA. For every (nASERTHalfLife) seconds behind schedule the blockchain gets,
-        // difficulty is cut in half. Doubled if blocks are ahead of schedule.
-        // Two days
-/*
-        consensus.nASERTHalfLife = 30 * 60;  //30 minutes half life
-        consensus.nASERTActivationHeight = 10;
-        consensus.asertAnchorParams = Consensus::Params::ASERTAnchor{
-            0,        // anchor block height
-            0x1d0fffff,   // anchor block nBits
-            1718524492,   // anchor block previous block timestamp
-        };
-*/
-
-
-        consensus.fPowRandomX = true;
-        consensus.nRandomXEpochDuration = 7 * 24 * 60 * 60;     // one week
-        
-        //height at which RandomX hashing starts
-        consensus.RandomXHeight = 200000;
-        
-        //Difficulty level at which RandomX is triggered
-        consensus.RandomX_diff_trigger = 0x1d00ff;
-        
-        //Difficulty multiple when RandomX is triggered
-        consensus.RandomX_diff_mult = 1000;
-        
-        //Version bit to signal Randomx blocks
-        consensus.RandomX_version_bit = 15;
-        
-        genesis = CreateAlphaGenesisBlock(1718524492, 40358186, 0x1d0fffff, 1, 10 * COIN);
-        
-        consensus.hashGenesisBlock = genesis.GetHash();
-        
-        assert(consensus.hashGenesisBlock == uint256S("0x0000000cd159482c9663a50e6a23a63155f9477384843473b784449b897569bf"));
-        assert(genesis.hashMerkleRoot == uint256S("0xc61f9003735f01c77c4a8b3554b86b8bda7ce1f3854f1e657abfad6f49462614"));
-        
-        vFixedSeeds.clear();
-        vSeeds.clear();
-
-
-
-        fDefaultConsistencyChecks = false;
-        m_is_mockable_chain = false;
-
-       
-        
-        checkpointData = {
-            {
-//                { 8000,  uint256S("0x0000000069e244f73d78e8fd29ba2fd2ed618bd6fa2ee92559f542fdb26e7c1d")},
-//                { 10000, uint256S("0x00000006de7ea8bbc408e0b0d92aca299182df06720bf6d0f2551ebdc001752f")},
-//                { 50000, uint256S("0x000000003bcc759fd72afe7349581dc724845841a4fa0db85c3283136f22858a")},
-                { 60001, uint256S("0x000000002506435a08bf9b2470533527983ff2ec43810b92153a1b49c571d375")},
-            }
-        };
-
-        m_assumeutxo_data = {
-        };
-
-        chainTxData = ChainTxData{
-            0,
-            0,
-            0
-        };
-        
-        base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,0);
-        base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1,5);
-        base58Prefixes[SECRET_KEY] =     std::vector<unsigned char>(1,128);
-        base58Prefixes[EXT_PUBLIC_KEY] = {0x04, 0x88, 0xB2, 0x1E};
-        base58Prefixes[EXT_SECRET_KEY] = {0x04, 0x88, 0xAD, 0xE4};
-
-        bech32_hrp = "alpha";
-    }
-};
-
-/**
- * Testnet: public test network which is reset from time to time.
- */
-class CAlphaTestNetParams : public CChainParams {
-public:
-    CAlphaTestNetParams() {
-        m_chain_type = ChainType::ALPHATESTNET;
-        consensus.signet_blocks = false;
-        consensus.signet_challenge.clear();
-        consensus.nSubsidyHalvingInterval = 210000*5;
-        consensus.BIP34Height = 1; // Always active unless overridden
-        consensus.BIP34Hash = uint256();
-        consensus.BIP65Height = 1;  // Always active unless overridden
-        consensus.BIP66Height = 1;  // Always active unless overridden
-        consensus.CSVHeight = 1;    // Always active unless overridden
-        consensus.SegwitHeight = 0; // Always active unless overridden
-        consensus.MinBIP9WarningHeight = 0;
-        consensus.powLimit = uint256S("00007fffff000000000000000000000000000000000000000000000000000000");
-        consensus.nPowTargetTimespan = 14 * 24 * 60 * 60 / 5; // two weeks
-        consensus.nPowTargetSpacing = 2 * 60;
-        consensus.fPowAllowMinDifficultyBlocks = true;
-        consensus.fPowNoRetargeting = false;
-        consensus.nRuleChangeActivationThreshold = 1512; // 75% for testchains
-        consensus.nMinerConfirmationWindow = 2016; // nPowTargetTimespan / nPowTargetSpacing
-
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = Consensus::BIP9Deployment::NEVER_ACTIVE;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].min_activation_height = 0; // No activation delay
-
-        // Deployment of Taproot (BIPs 340-342)
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].bit = 2;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nStartTime = Consensus::BIP9Deployment::ALWAYS_ACTIVE;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].min_activation_height = 0; // No activation delay
-
-        consensus.nMinimumChainWork = uint256{};
-        consensus.defaultAssumeValid = uint256{};
-
-        // The half life for the ASERT DAA. For every (nASERTHalfLife) seconds behind schedule the blockchain gets,
-        // difficulty is cut in half. Doubled if blocks are ahead of schedule.
-        // Two days
-/*
-        consensus.nASERTHalfLife = 30 * 60;
-        consensus.nASERTActivationHeight = 301;
-        consensus.asertAnchorParams = Consensus::Params::ASERTAnchor{
-            280,          // anchor block height
-            0x1e7fffff,   // anchor block nBits
-            1714191827,   // anchor block previous block timestamp
-        };
-*/
-        pchMessageStart[0] = 0x0d;
-        pchMessageStart[1] = 0x12;
-        pchMessageStart[2] = 0x0a;
-        pchMessageStart[3] = 0x09;
-        nDefaultPort = 18592;
-        nPruneAfterHeight = 1000;
-        m_assumed_blockchain_size = 0;
-        m_assumed_chain_state_size = 0;
-
-        consensus.fPowRandomX = true;
-        consensus.nRandomXEpochDuration = 7 * 24 * 60 * 60;     // one week
-        genesis = CreateAlphaGenesisBlock(1296688602, 6107, 0x1e7fffff, 1, 10 * COIN);
-//        genesis.hashRandomX = uint256S("e848dddfb604a4b1783c8a38b6db5179ccd6911331f2be18bfec02522d95af86");
-        consensus.hashGenesisBlock = genesis.GetHash();
-//        assert(consensus.hashGenesisBlock == uint256S("0x6ed227489a38c8e66c6c41ad947998c8594d2708454630fd8df45cbc93b4aebb"));
-//        assert(genesis.hashMerkleRoot == uint256S("4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b"));
-
-        vFixedSeeds.clear();
-        vSeeds.clear();
-
-        base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,111);
-        base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1,196);
-        base58Prefixes[SECRET_KEY] =     std::vector<unsigned char>(1,239);
-        base58Prefixes[EXT_PUBLIC_KEY] = {0x04, 0x35, 0x87, 0xCF};
-        base58Prefixes[EXT_SECRET_KEY] = {0x04, 0x35, 0x83, 0x94};
-
-        bech32_hrp = "talpha";
-
-        fDefaultConsistencyChecks = false;
-        m_is_mockable_chain = false;
-
-        checkpointData = {
-        };
-
-        m_assumeutxo_data = {
-        };
-
-        chainTxData = ChainTxData{
-            0,
-            0,
-            0
-        };
-    }
-};
-
-/**
- * Regression test: intended for private networks only. Has minimal difficulty to ensure that
- * blocks can be found instantly.
- */
-class CAlphaRegTestParams : public CChainParams
-{
-public:
-    explicit CAlphaRegTestParams(const RegTestOptions& opts)
-    {
-        m_chain_type = ChainType::ALPHAREGTEST;
-        consensus.signet_blocks = false;
-        consensus.signet_challenge.clear();
-        consensus.nSubsidyHalvingInterval = 2000;
-        consensus.BIP34Height = 10;
-        consensus.BIP34Hash = uint256();
-        consensus.BIP65Height = 10;  // Always active unless overridden
-        consensus.BIP66Height = 10;  // Always active unless overridden
-        consensus.CSVHeight = 10;    // Always active unless overridden
-        consensus.SegwitHeight = 10; // Always active unless overridden
-        consensus.MinBIP9WarningHeight = 0;
-        consensus.powLimit = uint256S("00000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-        consensus.nPowTargetTimespan = 14 * 24 * 60 * 60 / 5; // two weeks
-        consensus.nPowTargetSpacing = 2 * 60;
-        consensus.fPowAllowMinDifficultyBlocks = false;
-        consensus.fPowNoRetargeting = false;
-        consensus.nRuleChangeActivationThreshold = 108; // 75% for testchains
-        consensus.nMinerConfirmationWindow = 144; // Faster than normal for regtest (144 instead of 2016)
-
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = 0;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].min_activation_height = 0; // No activation delay
-
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].bit = 2;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nStartTime = Consensus::BIP9Deployment::ALWAYS_ACTIVE;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].min_activation_height = 0; // No activation delay
-        
-        //This bit number is hard wired to 3 in CheckProofofWorkRandomx
- /*       consensus.vDeployments[Consensus::DEPLOYMENT_RANDOMX].bit = 3;
-        consensus.vDeployments[Consensus::DEPLOYMENT_RANDOMX].nStartTime = Consensus::BIP9Deployment::NEVER_ACTIVE;
-        consensus.vDeployments[Consensus::DEPLOYMENT_RANDOMX].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
-        consensus.vDeployments[Consensus::DEPLOYMENT_RANDOMX].min_activation_height = 20; // No activation delay
-  */
-        consensus.nMinimumChainWork = uint256{};
-        consensus.defaultAssumeValid = uint256{};
-
-        
-        //TODO
-        pchMessageStart[0] = 0xd9;
-        pchMessageStart[1] = 0xb4;
-        pchMessageStart[2] = 0xbe;
-        pchMessageStart[3] = 0xf9;
-        nDefaultPort = 18589;
-        nPruneAfterHeight = opts.fastprune ? 100 : 1000;
-        m_assumed_blockchain_size = 0;
-        m_assumed_chain_state_size = 0;
-
-
-//        consensus.nASERTHalfLife = 2 * 24 * 60 * 60;
-/*
-        consensus.nASERTHalfLife = 2 * 60;
-        consensus.nASERTActivationHeight = 60;
-        consensus.asertAnchorParams = Consensus::Params::ASERTAnchor{
-            58,        // anchor block height
-            0x1e0fffff,   // anchor block nBits
-            1724991415,   // anchor block previous block timestamp
-        };
-*/
-        
-        consensus.fPowRandomX = true;
-        consensus.nRandomXEpochDuration = 24 * 60 * 60;     // one day
-        
-        //height at which RandomX  starts
-        consensus.RandomXHeight = 100;
-        
-        //Difficulty level at which RandomX is triggered
-        consensus.RandomX_diff_trigger = 0x1d00ffff;
-        
-        //Difficulty multiple when RandomX is triggered
-        consensus.RandomX_diff_mult = 1000;
-        
-        //Version bit to signal Randomx blocks
-        consensus.RandomX_version_bit = 15;
-        
-
-
-        genesis = CreateAlphaGenesisBlock(1718524492, 672420, 0x1e0fffff, 1, 10 * COIN);
-
-
-        for (const auto& [dep, height] : opts.activation_heights) {
-            switch (dep) {
-            case Consensus::BuriedDeployment::DEPLOYMENT_SEGWIT:
-                consensus.SegwitHeight = int{height};
-                break;
-            case Consensus::BuriedDeployment::DEPLOYMENT_HEIGHTINCB:
-                consensus.BIP34Height = int{height};
-                break;
-            case Consensus::BuriedDeployment::DEPLOYMENT_DERSIG:
-                consensus.BIP66Height = int{height};
-                break;
-            case Consensus::BuriedDeployment::DEPLOYMENT_CLTV:
-                consensus.BIP65Height = int{height};
-                break;
-            case Consensus::BuriedDeployment::DEPLOYMENT_CSV:
-                consensus.CSVHeight = int{height};
-                break;
-            }
-        }
-
-        for (const auto& [deployment_pos, version_bits_params] : opts.version_bits_parameters) {
-            consensus.vDeployments[deployment_pos].nStartTime = version_bits_params.start_time;
-            consensus.vDeployments[deployment_pos].nTimeout = version_bits_params.timeout;
-            consensus.vDeployments[deployment_pos].min_activation_height = version_bits_params.min_activation_height;
-        }
-
-
-//        genesis = CreateAlphaGenesisBlock(1718524492, 2, 0x207fffff, 1, 10 * COIN);
-//        genesis = CreateAlphaGenesisBlock(1718524492, 40358186, 0x1d0fffff, 1, 10 * COIN);
-//        genesis.hashRandomX = uint256S("0x177a9deba97f0dae00a6bf55e03671ec6bce7051d6a5054db49237598b803f93");
-   
-        consensus.hashGenesisBlock = genesis.GetHash();
-//        assert(consensus.hashGenesisBlock == uint256S("0x6ed227489a38c8e66c6c41ad947998c8594d2708454630fd8df45cbc93b4aebb"));
-        
-        assert(consensus.hashGenesisBlock == uint256S("0000054a175a384631d1d82709f6341c69f2a3a81fa802e8f1846ba4ab447a98"));
-        assert(genesis.hashMerkleRoot == uint256S("0xc61f9003735f01c77c4a8b3554b86b8bda7ce1f3854f1e657abfad6f49462614"));
-        
-        
- //       consensus.hashGenesisBlock = genesis.GetHash();
- //       assert(consensus.hashGenesisBlock == uint256S("0x0000000cd159482c9663a50e6a23a63155f9477384843473b784449b897569bf"));
- //       assert(genesis.hashMerkleRoot == uint256S("0xc61f9003735f01c77c4a8b3554b86b8bda7ce1f3854f1e657abfad6f49462614"));
-
-        vFixedSeeds.clear(); //!< Regtest mode doesn't have any fixed seeds.
-        vSeeds.clear();
-        vSeeds.emplace_back("dummySeed.invalid.");
-
-        fDefaultConsistencyChecks = true;
-        m_is_mockable_chain = true;
-
-        checkpointData = {
-        };
-
-        m_assumeutxo_data = {
-        };
-
-        chainTxData = ChainTxData{
-            0,
-            0,
-            0
-        };
-
-        base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,111);
-        base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1,196);
-        base58Prefixes[SECRET_KEY] =     std::vector<unsigned char>(1,239);
-        base58Prefixes[EXT_PUBLIC_KEY] = {0x04, 0x35, 0x87, 0xCF};
-        base58Prefixes[EXT_SECRET_KEY] = {0x04, 0x35, 0x83, 0x94};
-
-        bech32_hrp = "ralpha";
-    }
-};
-
-std::unique_ptr<const CChainParams> CChainParams::AlphaRegTest(const RegTestOptions& options)
-{
-    return std::make_unique<const CAlphaRegTestParams>(options);
-}
-
-std::unique_ptr<const CChainParams> CChainParams::AlphaTestNet()
-{
-    return std::make_unique<const CAlphaTestNetParams>();
-}
-
-std::unique_ptr<const CChainParams> CChainParams::AlphaMain()
-{
-    return std::make_unique<const CAlphaMainParams>();
-}
-
-// !SCASH END

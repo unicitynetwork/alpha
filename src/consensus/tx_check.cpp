@@ -1,4 +1,5 @@
 // Copyright (c) 2017-2021 The Bitcoin Core developers
+// Copyright (c) 2024 Makoto Sakuyama
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -56,7 +57,7 @@ bool CheckTransaction(const CTransaction& tx, TxValidationState& state)
                 return state.Invalid(TxValidationResult::TX_CONSENSUS, "bad-txns-prevout-null");
     }
 // !ALPHA
-    if (g_isRandomX && tx.vin.size() != 1)
+    if (g_isAlpha && tx.vin.size() != 1)
             return state.Invalid(TxValidationResult::TX_CONSENSUS, "bad-txns-too-many-inputs", "Alpha Transactions must have exactly one input");
 // !ALPHA END
     

@@ -1,6 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2022 The Bitcoin Core developers
 // Copyright (c) 2024 The Scash developers
+// Copyright (c) 2024 Makoto Sakuyama
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -152,7 +153,7 @@ struct Params {
     }
 
     // !SCASH
-    bool fPowRandomX{false};
+    // bool fPowRandomX{false};
     uint32_t nRandomXEpochDuration;
 
     /** Used by the ASERT DAA */
@@ -165,20 +166,16 @@ struct Params {
     };
     std::optional<ASERTAnchor> asertAnchorParams;
     
-// !ALPHA
+    // !ALPHA
+    // Enable Randomx and restricted transaction inputs
+    bool fAlphaEnabled{false};
+        
     //height at which RandomX starts
     int RandomXHeight;
-    
-    //Difficulty level at which RandomX is triggered
-    uint32_t RandomX_diff_trigger;
-    
-    //Difficulty multiple when RandomX is triggered
-    int RandomX_diff_mult;
-    
-    //version bit for Randomx signaling
-    int RandomX_version_bit;
-    
-// !ALPHA END
+
+    //nBits multiplier when RandomX is triggered
+    uint32_t RandomX_DiffMult;
+    // !ALPHA END
 
     // !SCASH END
 };

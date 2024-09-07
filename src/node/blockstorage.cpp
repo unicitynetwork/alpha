@@ -1,5 +1,6 @@
 // Copyright (c) 2011-2022 The Bitcoin Core developers
 // Copyright (c) 2024 The Scash developers
+// Copyright (c) 2024 Makoto Sakuyama
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -131,21 +132,22 @@ bool BlockTreeDB::LoadBlockIndexGuts(const Consensus::Params& consensusParams, s
                 pindexNew->nStatus        = diskindex.nStatus;
                 pindexNew->nTx            = diskindex.nTx;
 
-                // !ALPHA
-                //TODO WILL THIS WORK WITH VERSIONBITS?
-//                if (pindexNew->nVersion > 1)
-                    if ((pindexNew->nVersion & (1 << 15)) != 0)
-                    pindexNew->hashRandomX    = diskindex.hashRandomX;
-                
-//                if (pindexNew->nHeight >= consensusParams.AIP1Height)
-//                {
-//                    pindexNew->hashRandomX    = diskindex.hashRandomX;
-//                }
+/*                // !SCASH
+                pindexNew->hashRandomX    = diskindex.hashRandomX;
 
                 if (!CheckProofOfWorkRandomX(pindexNew->GetBlockHeader(), consensusParams, POW_VERIFY_COMMITMENT_ONLY)) {
                     return error("%s: CheckProofOfWork failed: %s", __func__, pindexNew->ToString());
                 }
                 // !SCASH END
+*/
+                // !ALPHA
+                if ((pindexNew->nVersion & (1 << g_Rx_versionbit)) != 0)
+                    pindexNew->hashRandomX    = diskindex.hashRandomX;
+
+                if (!CheckProofOfWorkRandomX(pindexNew->GetBlockHeader(), consensusParams, POW_VERIFY_COMMITMENT_ONLY)) {
+                    return error("%s: CheckProofOfWork failed: %s", __func__, pindexNew->ToString());
+                }
+                // !ALPHA END
 
                 pcursor->Next();
             } else {

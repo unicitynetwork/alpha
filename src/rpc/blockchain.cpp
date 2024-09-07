@@ -1,6 +1,7 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2009-2022 The Bitcoin Core developers
 // Copyright (c) 2024 The Scash developers
+// Copyright (c) 2024 Makoto Sakuyama
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -170,13 +171,13 @@ UniValue blockheaderToJSON(const CBlockIndex& tip, const CBlockIndex& blockindex
     if (pnext)
         result.pushKV("nextblockhash", pnext->GetBlockHash().GetHex());
 
-    // !SCASH ALPHA todo can remove the condition here 
-    if ((blockindex.nVersion & (1 << 15)) != 0) {
+    // !ALPHA
+    if ((blockindex.nVersion & (1 << g_Rx_versionbit)) != 0) {
         result.pushKV("rx_epoch", GetEpoch(blockindex.nTime, Params().GetConsensus().nRandomXEpochDuration));
         result.pushKV("rx_hash", blockindex.hashRandomX.GetHex());
         result.pushKV("rx_cm", GetRandomXCommitment(blockindex.GetBlockHeader()).GetHex());
     }
-    // !SCASH END
+    // !ALPHA END
 
     return result;
 }

@@ -1,5 +1,6 @@
 // Copyright (c) 2011-2022 The Bitcoin Core developers
 // Copyright (c) 2024 The Scash developers
+// Copyright (c) 2024 Makoto Sakuyama
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -1073,11 +1074,11 @@ static RPCHelpMan bumpfee_helper(std::string method_name)
         throw JSONRPCError(RPC_WALLET_ERROR, "bumpfee is not available with wallets that have private keys disabled. Use psbtbumpfee instead.");
     }
 
-    // !SCASH
-    if (g_isRandomX) {
+    // !ALPHA
+    if (g_isAlpha) {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "RBF is not supported.");
     }
-    // !SCASH END
+    // !ALPHA END
 
     uint256 hash(ParseHashV(request.params[0], "txid"));
 

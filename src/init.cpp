@@ -1,6 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2022 The Bitcoin Core developers
 // Copyright (c) 2024 The Scash developers
+// Copyright (c) 2024 Makoto Sakuyama
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -1086,7 +1087,7 @@ bool AppInitParameterInteraction(const ArgsManager& args)
         }
     }
 /*
-    // !SCASH ALPHA TODO
+    // !SCASH
     if (chain == ChainType::SCASHMAIN || chain == ChainType::SCASHREGTEST || chain == ChainType::SCASHTESTNET) {
         if (args.GetBoolArg("-mempoolfullrbf", DEFAULT_MEMPOOL_FULL_RBF)) {
             return InitError(Untranslated("RBF is not supported."));
@@ -1105,7 +1106,7 @@ bool AppInitParameterInteraction(const ArgsManager& args)
     // !SCASH END
 */
     
-    // !ALPHA TODO
+    // !ALPHA
     if (chain == ChainType::ALPHAMAIN || chain == ChainType::ALPHAREGTEST || chain == ChainType::ALPHATESTNET) {
         if (args.GetBoolArg("-mempoolfullrbf", DEFAULT_MEMPOOL_FULL_RBF)) {
             return InitError(Untranslated("RBF is not supported."));
@@ -1179,8 +1180,8 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
     const CChainParams& chainparams = Params();
 
     // !ALPHA
-    if (chainparams.GetConsensus().fPowRandomX) {
-        g_isRandomX = true;
+    if (chainparams.GetConsensus().fAlphaEnabled) {
+        g_isAlpha = true;
         LogPrintf("%s: Alpha RandomX proof-of-work active\n", __func__);
         randomx_flags flags = randomx_get_flags();
         if (flags & RANDOMX_FLAG_ARGON2_AVX2) {

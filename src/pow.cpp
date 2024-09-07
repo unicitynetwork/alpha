@@ -1,6 +1,8 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2022 The Bitcoin Core developers
 // Copyright (c) 2024 The Scash developers
+// Copyright (c) 2024 Makoto Sakuyama
+
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -17,9 +19,6 @@
 #include <randomx.h>
 #include <logging.h>
 #include <boost/compute/detail/lru_cache.hpp>
-
-// !ALPHA
-#include <versionbits.h>
 
 static Mutex rx_caches_mutex;
 
@@ -280,7 +279,30 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
     assert(pindexLast != nullptr);
     unsigned int nProofOfWorkLimit = UintToArith256(params.powLimit).GetCompact();
     
-    //ALPAH TODO need to make the difficult adjustment for RandomX trigggering here
+    // !ALPHA
+    //If we hit the switchover to RandomX reduce the difficult and reset ASERT
+    //and reset the ASERT
+    if (pindexLast->nHeight + 1 == params.RandomXHeight)
+    {
+ //       return 0x207fffff;
+        
+        arith_uint256 bnPrevDiff;
+        bnPrevDiff.SetCompact(pindexLast->nBits);
+
+        const arith_uint256 bnPowLimit = UintToArith256(params.powLimit);
+        
+        arith_uint256 bnNewDiff = bnPrevDiff*params.RandomX_DiffMult;
+        
+        if (bnNewDiff > bnPowLimit)
+            bnNewDiff = bnPowLimit;
+        
+        uint32_t nBitsNew = bnNewDiff.GetCompact();
+        
+        return nBitsNew;
+    }
+    // !ALPHA END
+
+
 
     // !SCASH
     // Use ASERT DAA if activated, otherwise use legacy Bitcoin DAA
@@ -290,7 +312,6 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
         }
     }
     // !SCASH END
-    
 
 
     // Only change once per difficulty adjustment interval
@@ -326,7 +347,7 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
 
     
     // !ALPHA
-    // chain already running 
+    // Keep the legacy Bitcoin calculation
     int nHeightFirst = pindexLast->nHeight - ((int)params.DifficultyAdjustmentInterval() - 1);
     // !ALPHA END
 
@@ -449,8 +470,11 @@ bool CheckProofOfWork(uint256 hash, unsigned int nBits, const Consensus::Params&
 
 // !SCASH
 
+
+// !ALPHA
 // Seed string contains an epoch integer and is sha256d hashed to derive the seed hash (RandomX key).
 static const char *RANDOMX_EPOCH_SEED_STRING = "Alpha/RandomX/Epoch/%d";
+// !ALPHA END
 
 // Epoch is Unix time stamp in seconds divided by epoch duration in seconds.
 uint32_t GetEpoch(uint32_t nTimestamp, uint32_t nDuration) {
@@ -609,20 +633,13 @@ uint256 GetRandomXCommitment(const CBlockHeader& block, uint256 *inHash) {
  */
 bool CheckProofOfWorkRandomX(const CBlockHeader& block, const Consensus::Params& params, POWVerifyMode verifyMode, uint256 *outHash)
 {
-    // Legacy chains continue to use original sha256d PoW
-    bool versionbits_supported = (block.nVersion & VERSIONBITS_TOP_MASK) == VERSIONBITS_TOP_BITS;
-    
+    // !ALPHA
     // Check if the block randomx bit is set
-    bool fRandomX_block = (block.nVersion & (1 << params.RandomX_version_bit)) != 0;
+    bool fRandomX_block = (block.nVersion & (1 << g_Rx_versionbit)) != 0;
     
-    if (block.nVersion == 1 || !fRandomX_block) {
-        std::cout << "RandomX is not active for this block." << std::endl;
+    if (block.nVersion == 1 || !fRandomX_block)
         return CheckProofOfWork(block.GetHash(), block.nBits, params);
-    }
-    else
-        std::cout << "RandomX is active in this block." << std::endl;
-    
-
+    // !ALPHA END
     
     unsigned int nBits = block.nBits;
 

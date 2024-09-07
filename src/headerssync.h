@@ -17,8 +17,6 @@
 #include <deque>
 #include <vector>
 
-//TODO ALPHA
-
 // A compressed CBlockHeader, which leaves out the prevhash
 struct CompressedHeader {
     // header
