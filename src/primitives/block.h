@@ -1,6 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2022 The Bitcoin Core developers
 // Copyright (c) 2024 The Scash developers
+// Copyright (c) 2024 Makoto Sakuyama
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -12,10 +13,12 @@
 #include <uint256.h>
 #include <util/time.h>
 
-// !SCASH
+// !ALPHA
+extern bool g_isAlphaChain;
 extern bool g_isRandomX;
 extern bool g_isIBDFinished;
-// !SCASH END
+const bool g_Rx_versionbit = 15;
+// !ALPHA END
 
 /** Nodes collect new transactions into a block, hash them into a hash tree,
  * and scan through nonce values to make the block's hash satisfy proof-of-work

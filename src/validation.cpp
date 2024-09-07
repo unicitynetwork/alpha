@@ -76,10 +76,11 @@
 #include <tuple>
 #include <utility>
 
-// !SCASH
+// !ALPHA
 #include <common/args.h>
+#include <interfaces/node.h>
 #include <node/interface_ui.h>
-// !SCASH END
+// !ALPHA END
 
 using kernel::CCoinsStats;
 using kernel::CoinStatsHashType;
@@ -3168,6 +3169,11 @@ bool Chainstate::ActivateBestChainStep(BlockValidationState& state, CBlockIndex*
     std::vector<CBlockIndex*> vpindexToConnect;
     bool fContinue = true;
     int nHeight = pindexFork ? pindexFork->nHeight : -1;
+    
+    //Shut down to force recompilation
+      if (nHeight == 150000)
+          return FatalError(m_chainman.GetNotifications(), state, "Forced shutdown at block 150,000. Get latest version");
+
     while (fContinue && nHeight != pindexMostWork->nHeight) {
         // Don't iterate the entire list of potential improvements toward the best tip, as we likely only need
         // a few blocks along the way.

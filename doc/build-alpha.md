@@ -1,7 +1,5 @@
 # ALPHA BUILD NOTES
 
-Alpha is a fork of Bitcoin Core - see whitepaper
-
 Building Alpha follows the same instructions as building Bitcoin. The Alpha network shares the same features and rules as Bitcoin mainnet, as specified in Bitcoin Core v27.0.
 
 The Linux version of the node `alphad` and GUI app `alpha-qt` are both supported, with Windows binaries also  available (cross-compiled on Linux). Note that Windows users can build from source by following the Linux instructions when building in Ubuntu on [Windows Subsystem for Linux (WSL)](https://learn.microsoft.com/en-us/windows/wsl/about).

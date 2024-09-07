@@ -95,7 +95,7 @@ std::string CopyrightHolders(const std::string& strPrefix)
 
     // !SCASH
     if (copyright_devs.find("alpha") == std::string::npos) {
-        strCopyrightHolders += "\nCopyright (C) 2024 Makoto Sakuyama";
+        strCopyrightHolders += "\nCopyright (C) 2024 The Scash developers\nCopyright (C) 2024 Makoto Sakuyama\n ";
     }
     // !SCASH END
     return strCopyrightHolders;
@@ -103,10 +103,9 @@ std::string CopyrightHolders(const std::string& strPrefix)
 
 std::string LicenseInfo()
 {
-    // !SCASH
+    // !ALPHA
     const std::string URL_SOURCE_CODE = "<https://github.com/sakuyama2024/alphacash>";
-    // !SCASH END
-
+/*
     return CopyrightHolders(strprintf(_("Copyright (C) %i-%i").translated, 2009, COPYRIGHT_YEAR) + " ") + "\n" +
            "\n" +
            strprintf(_("Please contribute if you find %s useful. "
@@ -118,4 +117,15 @@ std::string LicenseInfo()
            _("This is experimental software.").translated + "\n" +
            strprintf(_("Distributed under the MIT software license, see the accompanying file %s or %s").translated, "COPYING", "<https://opensource.org/licenses/MIT>") +
            "\n";
+*/
+    
+    return CopyrightHolders(strprintf("Copyright (C) %i-%i", 2009, COPYRIGHT_YEAR) + " ") + "\n" +
+               "\n" +
+               strprintf("Visit <https://github.com/sakuyama2024/alphacash> for more info.") +
+               "\n" +
+               "This is experimental software." + "\n" +
+               strprintf("Distributed under the MIT software license, see the accompanying file %s or %s", "COPYING", "<https://opensource.org/licenses/MIT>") +
+               "\n";
+    
+    // !ALPHA END
 }

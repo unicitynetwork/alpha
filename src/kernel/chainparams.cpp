@@ -995,7 +995,15 @@ public:
         fDefaultConsistencyChecks = false;
         m_is_mockable_chain = false;
 
+       
+        
         checkpointData = {
+            {
+//                { 8000,  uint256S("0x0000000069e244f73d78e8fd29ba2fd2ed618bd6fa2ee92559f542fdb26e7c1d")},
+//                { 10000, uint256S("0x00000006de7ea8bbc408e0b0d92aca299182df06720bf6d0f2551ebdc001752f")},
+//                { 50000, uint256S("0x000000003bcc759fd72afe7349581dc724845841a4fa0db85c3283136f22858a")},
+                { 60001, uint256S("0x000000002506435a08bf9b2470533527983ff2ec43810b92153a1b49c571d375")},
+            }
         };
 
         m_assumeutxo_data = {
@@ -1187,7 +1195,7 @@ public:
         consensus.nRandomXEpochDuration = 24 * 60 * 60;     // one day
         
         //height at which RandomX  starts
-        consensus.RandomXHeight = 2000;
+        consensus.RandomXHeight = 100;
         
         //Difficulty level at which RandomX is triggered
         consensus.RandomX_diff_trigger = 0x1d00ffff;
