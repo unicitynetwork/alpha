@@ -129,7 +129,7 @@ public:
         // Two days
 
         consensus.nASERTHalfLife = 30 * 60;  //30 minutes half life
-        consensus.nASERTActivationHeight = 10;
+        consensus.nASERTActivationHeight = 68718;
         consensus.asertAnchorParams = Consensus::Params::ASERTAnchor{
             68718,        // anchor block height
             0x1e1d7cb5,   // anchor block nBits
