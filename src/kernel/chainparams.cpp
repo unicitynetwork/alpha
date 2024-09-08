@@ -952,7 +952,7 @@ static CBlock CreateScashGenesisBlock(uint32_t nTime, uint32_t nNonce, uint32_t 
     return CreateGenesisBlock(pszTimestamp, genesisOutputScript, nTime, nNonce, nBits, nVersion, genesisReward);
 }
 
-/*
+
 
 class CScashMainParams : public CChainParams {
 public:
