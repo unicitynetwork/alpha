@@ -2,7 +2,7 @@
 
 Building Alpha follows the same instructions as building Bitcoin. The Alpha network shares the same features and rules as Bitcoin mainnet, as specified in Bitcoin Core v27.0.
 
-The Linux version of the node `alphad` and GUI app `alpha-qt` are both supported, with Windows binaries also  available (cross-compiled on Linux). Note that Windows users can build from source by following the Linux instructions when building in Ubuntu on [Windows Subsystem for Linux (WSL)](https://learn.microsoft.com/en-us/windows/wsl/about).
+The Linux version of the node `alphad` and GUI app `alpha-qt` are both supported. Macos versions have been tested on x86 and Arm. Windows binaries are also available (cross-compiled on Linux). Note that Windows users can build from source by following the Linux instructions when building in Ubuntu on [Windows Subsystem for Linux (WSL)](https://learn.microsoft.com/en-us/windows/wsl/about).
 
 For more specific instructions on building, see [`build-unix.md`](build-unix.md) in this directory.
 
@@ -38,12 +38,12 @@ Exit WSL and then restart WSL.
 Download the latest version of Alpha and checkout the version you intend to build. If you want to build a specific version, you can replace `alpha_master` with the version tag.
 
 ```bash
-git clone https://github.com/sakuyama2024/alpha.git
+git clone https://github.com/sakuyama2024/alpha_test1
 cd alpha
-git checkout alpha_master
 ```
+ALPHA TODO update github repo on go live (currently testing only) 
 
-## Building for Linux
+## Building for Linux/MacOS
 
 Alpha requires building with the depends system.
 
@@ -51,7 +51,8 @@ When calling `make` use `-j N` for N parallel jobs.
 
 ### Node software without the GUI
 
-To build just the node software `alphad` and not the QT GUI app:
+To build just the node software `alphad` and not the QT GUI app: 
+
 
 ```bash
 ./autogen.sh
@@ -60,6 +61,16 @@ make -C depends NO_QT=1
 make
 make install
 ```
+
+For MacOS depends on whether your are using x86 or ARM. Look in the depends directory and look for the build directory - typically
+ 
+aarch64-apple-darwin23.3.0  or
+x86_64-apple-darwin23.4.0
+
+replace the --prefix=$PWD/depends/x86_64-pc-linux-gnu
+with the correct directory name
+
+
 
 ### Node software with the GUI
 
@@ -126,7 +137,7 @@ adddnsseed=
 
 ### Connecting to the network
 
-To help find other nodes on the network, a [DNS seed](https://bitcoin.stackexchange.com/questions/14371/what-is-a-dns-seed-node-vs-a-seed-node) has been specified. The DNS seed shown above is for testing purposes and may not always be online. Users are advised to ask the community for a list of [reliable DNS seeds](https://github.com/bitcoin/bitcoin/blob/master/doc/dnsseed-policy.md) to use, as well as the IP addresses of stable nodes on the network which can be used with the `-addnode` and `-seednode` RPC calls.
+To help find other nodes on the network, a list of fixed seed nodes are hardwired in the code. They may or may not be avaialble.  If you know the IP addresses of a stable node use the `-addnode` and `-seednode` RPC calls.
 
 If you intend to use the same configuration file with multiple networks, the config sections are named as follows:
 ```
@@ -196,7 +207,7 @@ randomxfastmode=1
 
 ### Main network and Testnet chain
 
-Mining takes place inside [cpuminer-alpha](https://github.com/sakuyama2024/cpuminer-alpha) which is dedicated mining software that connects to the alpha node and retrieves mining jobs via RPC `getblocktemplate`. The 'randomxfastmode' configuration option is not required for the Alpha node, since mining occurs inside `cpuminer-alpha` which always runs in fast mode.
+Mining takes place using [Alphaminer](https://github.com/sakuyama2024/Alphaminer) which is dedicated mining software that connects to the alpha node and retrieves mining jobs via RPC `getblocktemplate`. The 'randomxfastmode' configuration option is not required for the Alpha node, since mining occurs inside `Alphaminer` which always runs in fast mode.
 
 ### Mining Pools
 
