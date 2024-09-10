@@ -38,7 +38,7 @@ Exit WSL and then restart WSL.
 Download the latest version of Alpha and checkout the version you intend to build. If you want to build a specific version, you can replace `alpha_master` with the version tag.
 
 ```bash
-git clone https://github.com/sakuyama2024/alpha_test1
+git clone https://github.com/sakuyama2024/alpha_test1 alpha
 cd alpha
 ```
 ALPHA TODO update github repo on go live (currently testing only) 
