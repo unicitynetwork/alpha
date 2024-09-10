@@ -128,12 +128,14 @@ public:
         // difficulty is cut in half. Doubled if blocks are ahead of schedule.
         // Two days
 
+        
+
         consensus.nASERTHalfLife = 30 * 60;  //30 minutes half life
-        consensus.nASERTActivationHeight = 68718;
+        consensus.nASERTActivationHeight = 70240;
         consensus.asertAnchorParams = Consensus::Params::ASERTAnchor{
-            68718,        // anchor block height
+            70232,        // anchor block height
             0x1e1d7cb5,   // anchor block nBits
-            1725725954,   // anchor block previous block timestamp
+            1725980278,   // anchor block previous block timestamp
         };
 
 
@@ -141,7 +143,7 @@ public:
         consensus.nRandomXEpochDuration = 7 * 24 * 60 * 60;     // one week
         
         //height at which RandomX hashing starts
-        consensus.RandomXHeight = 68718;
+        consensus.RandomXHeight = 70228;
         
         //Multipler when SHA256D switches to RandomX;
         consensus.RandomX_DiffMult = 100000;
@@ -339,24 +341,23 @@ public:
         m_assumed_chain_state_size = 0;
 
 
-        consensus.nASERTHalfLife = 2 * 24 * 60 * 60;
-        consensus.nASERTHalfLife = 60*60;
-        consensus.nASERTActivationHeight = 5;
+/*
+        consensus.nASERTHalfLife = 30 * 60;  //30 minutes half life
+        consensus.nASERTActivationHeight = 214;
         consensus.asertAnchorParams = Consensus::Params::ASERTAnchor{
-              1,        // anchor block height
-              0x1e0fffff,   // anchor block nBits
-              1725709669,   // anchor block previous block timestamp
+            213,        // anchor block height
+            0x2100ffff,   // anchor block nBits
+            1725895060,   // anchor block previous block timestamp
         };
+*/
 
         
         consensus.fAlphaEnabled = true;
         consensus.nRandomXEpochDuration = 24 * 60 * 60;     // one day
         
-        //height at which RandomX  starts
-        consensus.RandomXHeight = 100;
         
         //Difficulty is divided by this amount when RandomX blocks start
-        consensus.RandomX_DiffMult = 1000;
+        consensus.RandomX_DiffMult = 100000;
 
         genesis = CreateAlphaGenesisBlock(1718524492, 672420, 0x1e0fffff, 1, 10 * COIN);
 
