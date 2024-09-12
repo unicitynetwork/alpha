@@ -4,13 +4,12 @@ Alphacash
 
 **Abstract**: Alphacash is a censorship resistant peer-to-peer electronic cash system. Similar to Bitcoin, it uses a fixed emission schedule and longest chain Proof of Work consensus protocol. Unlike Bitcoin it supports unlimited blocksize  without sacrificing security or censorship resistance. The Alphacash coins replicate the self-verifiability property of physical cash, i.e. the coins are compact, authenticated data structures which can be passed through any medium peer-to-peer, chain-to-chain and verified without bridges or trusted third parties. Alphacash completes the Bitcoin vision, functioning as an Internet currency, a medium of exchange and a genuine alternative to physical cash.
 
-Alphacash was originally designed as the native currency of Unicity, a massvie online multi-player immersive simulation game engine. However as a standalone digital currency it has some valuable properties:
+Alphacash was originally designed as the native currency of Unicity, a massvie online multi-player immersive simulation game engine. However as a standalone digital currency it has some useful properties:
 
 1. genuine decentralization: zero-premine with ASIC resistant hash function
 2. massively parallel client side execution of smart contracts
 3. perfect privacy 
 4. unlimited throughput
-
 
 
 
@@ -36,8 +35,7 @@ This ensures local verifability i.e. each coin sub-ledger can be extracted from 
 
 **RandomX Hash Function**
 
-To achieve genuine decentralization we use an ASIC resistance hash function called RandomX similar to Monero https://github.com/tevador/RandomX 
-Nodes will automatically switch over from SHA256D on block 200,000.
+To achieve genuine decentralization we use the RandomX ASIC resistance hash function as used in Monero https://github.com/tevador/RandomX 
 
 
 **ASERT and 2 minute block time**
