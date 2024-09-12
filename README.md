@@ -2,6 +2,10 @@
 Alphacash
 =====================================
 
+Build instructions here [doc/build-alpha.md](doc/build-alpha.md).
+
+
+
 **Abstract**: Alphacash is a censorship resistant peer-to-peer electronic cash system. Similar to Bitcoin, it uses a fixed emission schedule and longest chain Proof of Work consensus protocol. Unlike Bitcoin it supports unlimited blocksize  without sacrificing security or censorship resistance. The Alphacash coins replicate the self-verifiability property of physical cash, i.e. the coins are compact, authenticated data structures which can be passed through any medium peer-to-peer, chain-to-chain and verified without bridges or trusted third parties. Alphacash completes the Bitcoin vision, functioning as an Internet currency, a medium of exchange and a genuine alternative to physical cash.
 
 Alphacash was originally designed as the native currency of Unicity, a massvie online multi-player immersive simulation game engine. However as a standalone digital currency it has some useful properties:
