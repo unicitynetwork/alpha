@@ -102,7 +102,7 @@ Copy the directory name and use it in the configure command. For example:
 or 
 
 ```bash
-`./configure --prefix=$PWD/depends/x86_64-apple-darwin23.4.0 --program-transform-name='s/bitcoin/alpha/g'`
+./configure --prefix=$PWD/depends/x86_64-apple-darwin23.4.0 --program-transform-name='s/bitcoin/alpha/g'
 make
 make install
 ```
