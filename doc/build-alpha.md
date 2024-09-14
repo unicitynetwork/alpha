@@ -35,15 +35,15 @@ Exit WSL and then restart WSL.
 
 ## Downloading the code
 
-Download the latest version of Alpha and checkout the version you intend to build. If you want to build a specific version, you can replace `alpha_master` with the version tag.
+Download the latest version of Alpha and checkout the version you intend to build. If you want to build a specific version, you can replace `alpha_main` with the version tag.
 
 ```bash
 git clone https://github.com/sakuyama2024/alpha_test1 alpha
 cd alpha
 ```
-ALPHA TODO update github repo on go live (currently testing only) 
+TODO change repo name to alpha after launch 
 
-## Building for Linux/MacOS
+## Building for Linux
 
 Alpha requires building with the depends system.
 
@@ -62,16 +62,6 @@ make
 make install
 ```
 
-For MacOS depends on whether your are using x86 or ARM. Look in the depends directory and look for the build directory - typically
- 
-aarch64-apple-darwin23.3.0  or
-x86_64-apple-darwin23.4.0
-
-replace the --prefix=$PWD/depends/x86_64-pc-linux-gnu
-with the correct directory name
-
-
-
 ### Node software with the GUI
 
 To build both the node software `alphad` and the QT GUI app `alphad-qt`
@@ -86,6 +76,37 @@ make install
 
 ### Executables
 The compiled executables will be found in `depends/x86_64-pc-linux-gnu/bin/` and can be copied to a folder on your path, typically `/usr/local/bin/` or `$HOME/.local/bin/`.
+
+## Building for MacOs
+
+Install xcode and brew (see instructions here 
+[OSX build instructions](doc/build-osx.md).
+
+`brew install automake libtool pkg-confg`
+
+```bash
+./autogen.sh
+make -C depends
+```
+If you are using x86 you should see a directory in `depends` something similiar to one of the folloiwng. The exact name may be different. 
+  
+`aarch64-apple-darwin23.3.0`  or `x86_64-apple-darwin23.4.0`
+
+Copy the directory name and use it in the configure command. For example:
+
+`./configure --prefix=$PWD/depends/x86_64-apple-darwin23.4.0 --program-transform-name='s/bitcoin/alpha/g'`
+
+or 
+
+```bash
+`./configure --prefix=$PWD/depends/x86_64-apple-darwin23.4.0 --program-transform-name='s/bitcoin/alpha/g'`
+make
+make install
+```
+
+
+### Executables
+The compiled executables will be found in `depends/aarch64-apple-darwin23.3.0` (change to correct name)  and can be copied to a folder on your path, typically `/usr/local/bin/` or `$HOME/.local/bin/`.
 
 
 ## Building for Windows (by cross-compiling on Linux)
