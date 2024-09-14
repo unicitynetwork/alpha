@@ -4,11 +4,22 @@ Building Alpha follows the same instructions as building Bitcoin. The Alpha netw
 
 The Linux version of the node `alphad` and GUI app `alpha-qt` are both supported. Macos versions have been tested on x86 and Arm. Windows binaries are also available (cross-compiled on Linux). Note that Windows users can build from source by following the Linux instructions when building in Ubuntu on [Windows Subsystem for Linux (WSL)](https://learn.microsoft.com/en-us/windows/wsl/about).
 
-For more specific instructions on building, see [`build-unix.md`](build-unix.md) in this directory.
+For more specific instructions on building see the specific build notes for each operating system in this directory.
 
-Also see the latest [Alpha release notes](release-notes/alpha/).
 
-## Getting started 
+## Downloading the code
+
+Download the latest version of Alpha and checkout the version you intend to build. If you want to build a specific version, you can replace `alpha_main` with the version tag.
+
+```bash
+git clone https://github.com/sakuyama2024/alpha_test1 alpha
+cd alpha
+```
+TODO change repo name to alpha after launch 
+
+## Building for Linux
+
+### Getting started
 
 Update your system and install the following tools required to build software.
 
@@ -18,7 +29,7 @@ sudo apt upgrade
 sudo apt install build-essential libtool autotools-dev automake pkg-config bsdmainutils curl git cmake bison
 ```
 
-## WSL for Windows
+### WSL for Windows
 
 Ignore this step if building on native Linux. The following only applies when building in WSL for Windows.
 
@@ -33,23 +44,15 @@ appendWindowsPath=false
 ```
 Exit WSL and then restart WSL.
 
-## Downloading the code
+###Building Alpha
 
-Download the latest version of Alpha and checkout the version you intend to build. If you want to build a specific version, you can replace `alpha_main` with the version tag.
-
-```bash
-git clone https://github.com/sakuyama2024/alpha_test1 alpha
-cd alpha
-```
-TODO change repo name to alpha after launch 
-
-## Building for Linux
 
 Alpha requires building with the depends system.
 
 When calling `make` use `-j N` for N parallel jobs.
 
 ### Node software without the GUI
+
 
 To build just the node software `alphad` and not the QT GUI app: 
 
@@ -77,10 +80,10 @@ make install
 ### Executables
 The compiled executables will be found in `depends/x86_64-pc-linux-gnu/bin/` and can be copied to a folder on your path, typically `/usr/local/bin/` or `$HOME/.local/bin/`.
 
-## Building for MacOs
+## Building for MacOS
 
 Install xcode and brew (see instructions here 
-[OSX build instructions](doc/build-osx.md).
+[OSX build instructions](build-osx.md).
 
 `brew install automake libtool pkg-confg`
 
