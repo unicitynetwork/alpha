@@ -17,7 +17,7 @@
 extern bool g_isAlpha;
 //extern bool g_isRandomX;
 extern bool g_isIBDFinished;
-const bool g_Rx_versionbit = 15;
+const int  g_Rx_versionbit = 1;
 // !ALPHA END
 
 /** Nodes collect new transactions into a block, hash them into a hash tree,
