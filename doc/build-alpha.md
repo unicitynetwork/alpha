@@ -29,6 +29,14 @@ sudo apt upgrade
 sudo apt install build-essential libtool autotools-dev automake pkg-config bsdmainutils curl git cmake bison
 ```
 
+make sure that you are using g++ version > 10
+You can check with 
+
+```bash
+g++ --version
+```
+
+
 ### WSL for Windows
 
 Ignore this step if building on native Linux. The following only applies when building in WSL for Windows.
