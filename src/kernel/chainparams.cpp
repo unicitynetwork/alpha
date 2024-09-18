@@ -86,6 +86,8 @@ public:
         consensus.CSVHeight = 100000;    // Always active unless overridden
         consensus.SegwitHeight = 100000; // Always active unless overridden
         consensus.MinBIP9WarningHeight = 0;
+        
+        //Changed this due to RandomX 
  //       consensus.powLimit = uint256S("00000fffff000000000000000000000000000000000000000000000000000000");
         consensus.powLimit = uint256S("000fffff00000000000000000000000000000000000000000000000000000000");
         

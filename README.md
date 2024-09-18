@@ -3,12 +3,13 @@ Alphacash
 =====================================
 
 Build instructions here [doc/build-alpha.md](doc/build-alpha.md).
+Alphacash is released under the terms of the MIT license.
 
 
 
 **Abstract**: Alphacash is a censorship resistant peer-to-peer electronic cash system. Similar to Bitcoin, it uses a fixed emission schedule and longest chain Proof of Work consensus protocol. Unlike Bitcoin it supports unlimited blocksize  without sacrificing security or censorship resistance. The Alphacash coins replicate the self-verifiability property of physical cash, i.e. the coins are compact, authenticated data structures which can be passed through any medium peer-to-peer, chain-to-chain and verified without bridges or trusted third parties. Alphacash completes the Bitcoin vision, functioning as an Internet currency, a medium of exchange and a genuine alternative to physical cash.
 
-Alphacash was originally designed as the native currency of Unicity, a massvie online multi-player immersive simulation game engine. However as a standalone digital currency it has some useful properties:
+Alphacash is designed to the native currency of Unicity, a new blockchain architecture that supports parallel execution of smart contracts. However as a standalone digital currency it has some useful properties:
 
 1. genuine decentralization: zero-premine with ASIC resistant hash function
 2. massively parallel client side execution of smart contracts
@@ -39,15 +40,33 @@ This ensures local verifability i.e. each coin sub-ledger can be extracted from 
 
 **RandomX Hash Function**
 
-To achieve genuine decentralization we use the RandomX ASIC resistance hash function as used in Monero https://github.com/tevador/RandomX 
+To democratize mining we use the RandomX ASIC resistance hash function as used in Monero https://github.com/tevador/RandomX 
+
+The hashing algorithm switched from SHA25D to RandomX on block 70228
+Difficulty was reduced by a factor of 100,000
 
 
-**ASERT and 2 minute block time**
+**10 ALPHA subsidy and 2 minute block time**
 
-The Bitcoin Cash implementation of an exponential moving average approach to difficulty adjustments is implemented to theoretically always target a correction toward a 2 minute block time. A half-life of one hour is used i.e. If the hashing power increases/decreases dramatically the difficuly will double/half every hour until the block time adjusts back to 2 mins.
+The subsidy is 10 ALPHA with a target block time of 2 minutes. Halving period measured in time is the same as Bitcoin or 210000*5 blocks
+
+**ASERT**
+
+The Bitcoin Cash implementation of an exponential moving average approach to difficulty adjustments is implemented to theoretically always target a correction toward a 2 minute block time. 
+
+ASERT was initiated on block 70232
+half-life 30 minutes
 
 
-Bitcoin Core is released under the terms of the MIT license.
+**GENESIS BLOCK**
+
+Script: "Financial Times 25/May/2024 What went wrong with capitalism"
+Time Sun Jun 16 07:54:52 UTC 2024
+nBits: 0x1d0fffff
+
+
+
+
 
 
 

@@ -32,7 +32,7 @@ static RPCHelpMan validateaddress()
     return RPCHelpMan{
         "validateaddress",
         // !ALPHA
-        "\nReturn information about the given Scash address.\n",
+        "\nReturn information about the given Alpha address.\n",
         {
             {"address", RPCArg::Type::STR, RPCArg::Optional::NO, "The Alpha address to validate"},
         },

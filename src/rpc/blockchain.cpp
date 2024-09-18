@@ -83,14 +83,15 @@ double GetDifficulty(const CBlockIndex& blockindex)
 {
     int nShift = (blockindex.nBits >> 24) & 0xff;
     
-// !ALPHA Different starting difficulty
+// !ALPHA 
+//Different starting difficulty
 //    double dDiff =
 //        (double)0x0000ffff / (double)(blockindex.nBits & 0x00ffffff);
     
     double dDiff =
         (double)0x000fffff / (double)(blockindex.nBits & 0x00ffffff);
 
-    // !ALPHA END
+// !ALPHA END
     
     while (nShift < 29)
     {

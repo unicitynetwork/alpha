@@ -15,8 +15,13 @@
 
 // !ALPHA
 extern bool g_isAlpha;
-//extern bool g_isRandomX;
 extern bool g_isIBDFinished;
+
+
+//g_Rx_versionbit is a hack as we need to know inside a block header
+//if it is a RandomX block or not. Since Versionbits was introduced
+//we can't simply incrememnt the vesion number and need to use a bit
+//of versionbits.
 const int  g_Rx_versionbit = 1;
 // !ALPHA END
 

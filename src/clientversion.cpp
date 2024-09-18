@@ -122,7 +122,7 @@ std::string LicenseInfo()
     
     return CopyrightHolders(strprintf("Copyright (C) %i-%i", 2009, COPYRIGHT_YEAR) + " ") + "\n" +
                "\n" +
-               strprintf("Visit <https://github.com/sakuyama2024/alphacash> for more info.") +
+               strprintf("Visit <https://github.com/sakuyama2024> for more info.") +
                "\n" +
                "This is experimental software." + "\n" +
                strprintf("Distributed under the MIT software license, see the accompanying file %s or %s", "COPYING", "<https://opensource.org/licenses/MIT>") +

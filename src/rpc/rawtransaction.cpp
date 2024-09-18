@@ -455,7 +455,7 @@ static RPCHelpMan createrawtransaction()
         rbf = request.params[3].get_bool();
     }
 
-    // ALPHA
+    // !ALPHA
     if (g_isAlpha && rbf.has_value() && rbf.value()) {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "RBF is not supported.");
     }

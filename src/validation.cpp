@@ -2808,16 +2808,21 @@ void Chainstate::UpdateTip(const CBlockIndex* pindexNew)
     if (!m_chainman.IsInitialBlockDownload()) {
         const CBlockIndex* pindex = pindexNew;
         for (int bit = 0; bit < VERSIONBITS_NUM_BITS; bit++) {
-            WarningBitsConditionChecker checker(m_chainman, bit);
-            ThresholdState state = checker.GetStateFor(pindex, params.GetConsensus(), m_chainman.m_warningcache.at(bit));
-            if (state == ThresholdState::ACTIVE || state == ThresholdState::LOCKED_IN) {
-                const bilingual_str warning = strprintf(_("Unknown new rules activated (versionbit %i)"), bit);
-                if (state == ThresholdState::ACTIVE) {
-                    m_chainman.GetNotifications().warning(warning);
-                } else {
-                    AppendWarning(warning_messages, warning);
+            // !ALPHA 
+            // Ignore the warning related to the RandomX bit
+            if ((g_isAlpha && bit == g_Rx_versionbit) == false){
+                WarningBitsConditionChecker checker(m_chainman, bit);
+                ThresholdState state = checker.GetStateFor(pindex, params.GetConsensus(), m_chainman.m_warningcache.at(bit));
+                if (state == ThresholdState::ACTIVE || state == ThresholdState::LOCKED_IN) {
+                    const bilingual_str warning = strprintf(_("Unknown new rules activated (versionbit %i)"), bit);
+                    if (state == ThresholdState::ACTIVE) {
+                        m_chainman.GetNotifications().warning(warning);
+                    } else {
+                        AppendWarning(warning_messages, warning);
+                    }
                 }
             }
+            // !ALPHA END
         }
     }
     UpdateTipLog(coins_tip, pindexNew, params, __func__, "", warning_messages.original);

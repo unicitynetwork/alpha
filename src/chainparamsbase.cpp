@@ -89,6 +89,7 @@ std::unique_ptr<CBaseChainParams> CreateBaseChainParams(const ChainType chain)
         return std::make_unique<CBaseChainParams>("alpharegtest", 18453, 18455);
             
     }
+    // !ALPHA END
     assert(false);
 }
 

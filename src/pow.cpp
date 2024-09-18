@@ -280,12 +280,9 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
     unsigned int nProofOfWorkLimit = UintToArith256(params.powLimit).GetCompact();
     
     // !ALPHA
-    //If we hit the switchover to RandomX reduce the difficult and reset ASERT
-    //and reset the ASERT
+    //When the blockheight is RandomXHeight (70,228) we reduce the difficulty by RandomX_DiffMult (100,000)
     if (pindexLast->nHeight + 1 == params.RandomXHeight)
     {
- //       return 0x207fffff;
-        
         arith_uint256 bnPrevDiff;
         bnPrevDiff.SetCompact(pindexLast->nBits);
 
