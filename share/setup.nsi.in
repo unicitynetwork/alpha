@@ -15,22 +15,22 @@ Unicode true
 !define URL @PACKAGE_URL@
 
 # MUI Symbol Definitions
-# !SCASH
-!define MUI_ICON "@abs_top_srcdir@/share/pixmaps/scash.ico"
-!define MUI_WELCOMEFINISHPAGE_BITMAP "@abs_top_srcdir@/share/pixmaps/nsis-wizard-scash.bmp"
+# !ALPHA
+!define MUI_ICON "@abs_top_srcdir@/share/pixmaps/alpha.ico"
+!define MUI_WELCOMEFINISHPAGE_BITMAP "@abs_top_srcdir@/share/pixmaps/nsis-wizard-alpha.bmp"
 !define MUI_HEADERIMAGE
 !define MUI_HEADERIMAGE_RIGHT
-!define MUI_HEADERIMAGE_BITMAP "@abs_top_srcdir@/share/pixmaps/nsis-header-scash.bmp"
-#! SCASH END
+!define MUI_HEADERIMAGE_BITMAP "@abs_top_srcdir@/share/pixmaps/nsis-header-alpha.bmp"
+#! ALPHA END
 !define MUI_FINISHPAGE_NOAUTOCLOSE
 !define MUI_STARTMENUPAGE_REGISTRY_ROOT HKLM
 !define MUI_STARTMENUPAGE_REGISTRY_KEY ${REGKEY}
 !define MUI_STARTMENUPAGE_REGISTRY_VALUENAME StartMenuGroup
 !define MUI_STARTMENUPAGE_DEFAULTFOLDER "@PACKAGE_NAME@"
 !define MUI_FINISHPAGE_RUN "$WINDIR\explorer.exe"
-# !SCASH
-!define MUI_FINISHPAGE_RUN_PARAMETERS $INSTDIR\@SCASH_GUI_NAME@@EXEEXT@
-# !SCASH END
+# !ALPHA
+!define MUI_FINISHPAGE_RUN_PARAMETERS $INSTDIR\@ALPHA_GUI_NAME@@EXEEXT@
+# !ALPHA END
 !define MUI_UNICON "${NSISDIR}\Contrib\Graphics\Icons\modern-uninstall.ico"
 !define MUI_UNWELCOMEFINISHPAGE_BITMAP "@abs_top_srcdir@/share/pixmaps/nsis-wizard.bmp"
 !define MUI_UNFINISHPAGE_NOAUTOCLOSE
@@ -56,9 +56,9 @@ Var StartMenuGroup
 !insertmacro MUI_LANGUAGE English
 
 # Installer attributes
-# !SCASH
-InstallDir $PROGRAMFILES64\Scash
-# !SCASH END
+# !ALPHA
+InstallDir $PROGRAMFILES64\Alpha
+# !ALPHA END
 CRCCheck force
 XPStyle on
 BrandingText " "
@@ -70,9 +70,9 @@ VIAddVersionKey CompanyName "${COMPANY}"
 VIAddVersionKey CompanyWebsite "${URL}"
 VIAddVersionKey FileVersion "@PACKAGE_VERSION@"
 VIAddVersionKey FileDescription "Installer for @PACKAGE_NAME@"
-# !SCASH
-VIAddVersionKey LegalCopyright "Copyright (C) 2009-@COPYRIGHT_YEAR@ @COPYRIGHT_HOLDERS_FINAL@ and the Scash Developers"
-# !SCASH END
+# !ALPHA
+VIAddVersionKey LegalCopyright "Copyright (C) 2009-@COPYRIGHT_YEAR@ @COPYRIGHT_HOLDERS_FINAL@ , the Scash Developers and Makoto Sakuyama"
+# !ALPHA END
 InstallDirRegKey HKCU "${REGKEY}" Path
 ShowUninstDetails show
 
@@ -80,22 +80,22 @@ ShowUninstDetails show
 Section -Main SEC0000
     SetOutPath $INSTDIR
     SetOverwrite on
-# !SCASH
-    File @abs_top_builddir@/release/@SCASH_GUI_NAME@@EXEEXT@
+# !ALPHA
+    File @abs_top_builddir@/release/@ALPHA_GUI_NAME@@EXEEXT@
     File /oname=COPYING.txt @abs_top_srcdir@/COPYING
-    File /oname=readme.txt @abs_top_srcdir@/doc/README_windows_scash.txt
-    File @abs_top_srcdir@/share/examples/scash.conf
-# !SCASH END
+    File /oname=readme.txt @abs_top_srcdir@/doc/README_windows_alpha.txt
+    File @abs_top_srcdir@/share/examples/alpha.conf
+# !ALPHA END
     SetOutPath $INSTDIR\share\rpcauth
     File @abs_top_srcdir@/share/rpcauth/*.*
     SetOutPath $INSTDIR\daemon
-# !SCASH
-    File @abs_top_builddir@/release/@SCASH_DAEMON_NAME@@EXEEXT@
-    File @abs_top_builddir@/release/@SCASH_CLI_NAME@@EXEEXT@
-    File @abs_top_builddir@/release/@SCASH_TX_NAME@@EXEEXT@
-    File @abs_top_builddir@/release/@SCASH_WALLET_TOOL_NAME@@EXEEXT@
-    File @abs_top_builddir@/release/@SCASH_TEST_NAME@@EXEEXT@
-# !SCASH END
+# !ALPHA
+    File @abs_top_builddir@/release/@ALPHA_DAEMON_NAME@@EXEEXT@
+    File @abs_top_builddir@/release/@ALPHA_CLI_NAME@@EXEEXT@
+    File @abs_top_builddir@/release/@ALPHA_TX_NAME@@EXEEXT@
+    File @abs_top_builddir@/release/@ALPHA_WALLET_TOOL_NAME@@EXEEXT@
+    File @abs_top_builddir@/release/@ALPHA_TEST_NAME@@EXEEXT@
+# !ALPHA END
     SetOutPath $INSTDIR
     WriteRegStr HKCU "${REGKEY}\Components" Main 1
 SectionEnd
@@ -106,28 +106,28 @@ Section -post SEC0001
     WriteUninstaller $INSTDIR\uninstall.exe
     !insertmacro MUI_STARTMENU_WRITE_BEGIN Application
     CreateDirectory $SMPROGRAMS\$StartMenuGroup
-# !SCASH
-    CreateShortcut "$SMPROGRAMS\$StartMenuGroup\$(^Name).lnk" $INSTDIR\@SCASH_GUI_NAME@@EXEEXT@
-    CreateShortcut "$SMPROGRAMS\$StartMenuGroup\@PACKAGE_NAME@ (testnet, 64-bit).lnk" "$INSTDIR\@SCASH_GUI_NAME@@EXEEXT@" "-chain=scashtestnet" "$INSTDIR\@SCASH_GUI_NAME@@EXEEXT@" 1
-# !SCASH END
+# !ALPHA
+    CreateShortcut "$SMPROGRAMS\$StartMenuGroup\$(^Name).lnk" $INSTDIR\@ALPHA_GUI_NAME@@EXEEXT@
+    CreateShortcut "$SMPROGRAMS\$StartMenuGroup\@PACKAGE_NAME@ (testnet, 64-bit).lnk" "$INSTDIR\@ALPHA_GUI_NAME@@EXEEXT@" "-chain=alphatestnet" "$INSTDIR\@ALPHA_GUI_NAME@@EXEEXT@" 1
+# !ALPHA END
     CreateShortcut "$SMPROGRAMS\$StartMenuGroup\Uninstall $(^Name).lnk" $INSTDIR\uninstall.exe
     !insertmacro MUI_STARTMENU_WRITE_END
     WriteRegStr HKCU "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$(^Name)" DisplayName "$(^Name)"
     WriteRegStr HKCU "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$(^Name)" DisplayVersion "@PACKAGE_VERSION@"
     WriteRegStr HKCU "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$(^Name)" Publisher "${COMPANY}"
     WriteRegStr HKCU "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$(^Name)" URLInfoAbout "${URL}"
-# !SCASH
-    WriteRegStr HKCU "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$(^Name)" DisplayIcon $INSTDIR\scash-qt.exe
-# !SCASH END
+# !ALPHA
+    WriteRegStr HKCU "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$(^Name)" DisplayIcon $INSTDIR\alpha-qt.exe
+# !ALPHA END
     WriteRegStr HKCU "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$(^Name)" UninstallString $INSTDIR\uninstall.exe
     WriteRegDWORD HKCU "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$(^Name)" NoModify 1
     WriteRegDWORD HKCU "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$(^Name)" NoRepair 1
     WriteRegStr HKCR "@PACKAGE_TARNAME@" "URL Protocol" ""
-# !SCASH
-    WriteRegStr HKCR "@PACKAGE_TARNAME@" "" "URL:Scash"
-    WriteRegStr HKCR "@PACKAGE_TARNAME@\DefaultIcon" "" $INSTDIR\@SCASH_GUI_NAME@@EXEEXT@
-    WriteRegStr HKCR "@PACKAGE_TARNAME@\shell\open\command" "" '"$INSTDIR\@SCASH_GUI_NAME@@EXEEXT@" "%1"'
-# !SCASH END
+# !ALPHA
+    WriteRegStr HKCR "@PACKAGE_TARNAME@" "" "URL:Alpha"
+    WriteRegStr HKCR "@PACKAGE_TARNAME@\DefaultIcon" "" $INSTDIR\@ALPHA_GUI_NAME@@EXEEXT@
+    WriteRegStr HKCR "@PACKAGE_TARNAME@\shell\open\command" "" '"$INSTDIR\@ALPHA_GUI_NAME@@EXEEXT@" "%1"'
+# !ALPHA END
 SectionEnd
 
 # Macro for selecting uninstaller sections
@@ -145,14 +145,14 @@ done${UNSECTION_ID}:
 
 # Uninstaller sections
 Section /o -un.Main UNSEC0000
-# !SCASH
-    Delete /REBOOTOK $INSTDIR\@SCASH_GUI_NAME@@EXEEXT@
-# !SCASH END
+# !ALPHA
+    Delete /REBOOTOK $INSTDIR\@ALPHA_GUI_NAME@@EXEEXT@
+# !ALPHA END
     Delete /REBOOTOK $INSTDIR\COPYING.txt
     Delete /REBOOTOK $INSTDIR\readme.txt
-# !SCASH
-    Delete /REBOOTOK $INSTDIR\scash.conf
-# !SCASH END
+# !ALPHA
+    Delete /REBOOTOK $INSTDIR\alpha.conf
+# !ALPHA END
     RMDir /r /REBOOTOK $INSTDIR\share
     RMDir /r /REBOOTOK $INSTDIR\daemon
     DeleteRegValue HKCU "${REGKEY}\Components" Main
@@ -163,9 +163,9 @@ Section -un.post UNSEC0001
     Delete /REBOOTOK "$SMPROGRAMS\$StartMenuGroup\Uninstall $(^Name).lnk"
     Delete /REBOOTOK "$SMPROGRAMS\$StartMenuGroup\$(^Name).lnk"
     Delete /REBOOTOK "$SMPROGRAMS\$StartMenuGroup\@PACKAGE_NAME@ (testnet, 64-bit).lnk"
-# !SCASH
-    Delete /REBOOTOK "$SMSTARTUP\Scash.lnk"
-# !SCASH END
+# !ALPHA
+    Delete /REBOOTOK "$SMSTARTUP\Alpha.lnk"
+# !ALPHA END
     Delete /REBOOTOK $INSTDIR\uninstall.exe
     Delete /REBOOTOK $INSTDIR\debug.log
     Delete /REBOOTOK $INSTDIR\db.log
