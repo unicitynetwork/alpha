@@ -7,16 +7,6 @@ The Linux version of the node `alphad` and GUI app `alpha-qt` are both supported
 For more specific instructions on building see the specific build notes for each operating system in this directory.
 
 
-## Downloading the code
-
-Download the latest version of Alpha and checkout the version you intend to build. If you want to build a specific version, you can replace `alpha_main` with the version tag.
-
-```bash
-git clone https://github.com/sakuyama2024/alpha_test1 alpha
-cd alpha
-```
-TODO change repo name to alpha after launch 
-
 ## Building for Linux
 
 ### Getting started
@@ -34,6 +24,12 @@ You can check with
 
 ```bash
 g++ --version
+```
+download the latest version of the source code
+
+```bash
+git clone https://github.com/sakuyama2024/alpha_test1 alpha
+cd alpha
 ```
 
 
@@ -93,19 +89,37 @@ The compiled executables will be found in `depends/x86_64-pc-linux-gnu/bin/` and
 Install xcode and brew (see instructions here 
 [OSX build instructions](build-osx.md).
 
-`brew install automake libtool pkg-confg`
+`brew install git automake libtool pkg-confg cmake bison`
+
+
+download the latest version of Alpha 
+
+```bash
+git clone https://github.com/sakuyama2024/alpha_test1 alpha
+cd alpha
+```
+
+Alpha requires building with the depends system.
+
+When calling `make` use `-j N` for N parallel jobs.
+
 
 ```bash
 ./autogen.sh
 make -C depends
 ```
-If you are using x86 you should see a directory in `depends` something similiar to one of the folloiwng. The exact name may be different. 
+
+You should see a directory in `depends` something similiar to one of the folloiwng depending on whether your mac is x86 or ARM. The exact name may be different. 
   
 `aarch64-apple-darwin23.3.0`  or `x86_64-apple-darwin23.4.0`
 
 Copy the directory name and use it in the configure command. For example:
 
-`./configure --prefix=$PWD/depends/x86_64-apple-darwin23.4.0 --program-transform-name='s/bitcoin/alpha/g'`
+```bash
+./configure --prefix=$PWD/depends/aarch64-apple-darwin23.3.0 --program-transform-name='s/bitcoin/alpha/g'
+make
+make install
+```
 
 or 
 
@@ -123,6 +137,8 @@ The compiled executables will be found in `depends/aarch64-apple-darwin23.3.0` (
 ## Building for Windows (by cross-compiling on Linux)
 
 Build on Linux and generate executables which run on Windows.
+
+Follow the same steps above for Linux. Then install the cross compiler and build.
 
 ```
 sudo apt install g++-mingw-w64-x86-64-posix 
@@ -155,7 +171,6 @@ The following is a sample `alpha.conf`.
 ```
 rpcuser=user
 rpcpassword=password
-chain=alpha
 daemon=1
 debug=1
 txindex=1
@@ -172,6 +187,7 @@ adddnsseed=
 To help find other nodes on the network, a list of fixed seed nodes are hardwired in the code. They may or may not be avaialble.  If you know the IP addresses of a stable node use the `-addnode` and `-seednode` RPC calls.
 
 If you intend to use the same configuration file with multiple networks, the config sections are named as follows:
+
 ```
 [btc]
 [btctestnet3]
