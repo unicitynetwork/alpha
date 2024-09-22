@@ -79,12 +79,24 @@ public:
         consensus.signet_blocks = false;
         consensus.signet_challenge.clear();
         consensus.nSubsidyHalvingInterval = 210000*5;  // keep the same halving time as BTC (5x the number of blocks)
-        consensus.BIP34Height = 100000; // Always active unless overridden
+        
+        
+//        consensus.BIP34Height = 100000; // Always active unless overridden
+//        consensus.BIP34Hash = uint256();
+//        consensus.BIP65Height = 100000;  // Always active unless overridden
+//        consensus.BIP66Height = 100000;  // Always active unless overridden
+//        consensus.CSVHeight = 100000;    // Always active unless overridden
+//        consensus.SegwitHeight = 100000; // Always active unless overridden
+       
+        consensus.BIP34Height = 70228;
         consensus.BIP34Hash = uint256();
-        consensus.BIP65Height = 100000;  // Always active unless overridden
-        consensus.BIP66Height = 100000;  // Always active unless overridden
-        consensus.CSVHeight = 100000;    // Always active unless overridden
-        consensus.SegwitHeight = 100000; // Always active unless overridden
+        consensus.BIP65Height = 70228;
+        consensus.BIP66Height = 70228;
+        consensus.CSVHeight = 70228;
+        consensus.SegwitHeight = 70228;
+        
+        
+        
         consensus.MinBIP9WarningHeight = 0;
         
         //Changed this due to RandomX 
