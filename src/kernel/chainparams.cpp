@@ -215,13 +215,13 @@ public:
         consensus.signet_blocks = false;
         consensus.signet_challenge.clear();
         consensus.nSubsidyHalvingInterval = 210000*5;
-        consensus.BIP34Height = 0; // Always active
+        consensus.BIP34Height = 1; // Always active
         consensus.BIP34Hash = uint256();
-        consensus.BIP65Height = 0;  // Always active
-        consensus.BIP66Height = 0;  // Always active
-        consensus.CSVHeight = 0;    // Always active
-        consensus.SegwitHeight = 0; // Always active
-        consensus.MinBIP9WarningHeight = 0;
+        consensus.BIP65Height = 1;  // Always active
+        consensus.BIP66Height = 1;  // Always active
+        consensus.CSVHeight = 1;    // Always active
+        consensus.SegwitHeight = 1; // Always active
+        consensus.MinBIP9WarningHeight = 1;
         consensus.powLimit = uint256S("000fffff00000000000000000000000000000000000000000000000000000000");
         consensus.nPowTargetTimespan = 14 * 24 * 60 * 60 / 5; // two weeks
         consensus.nPowTargetSpacing = 2 * 60;
