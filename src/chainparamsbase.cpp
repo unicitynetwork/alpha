@@ -84,9 +84,9 @@ std::unique_ptr<CBaseChainParams> CreateBaseChainParams(const ChainType chain)
     case ChainType::ALPHAMAIN:
         return std::make_unique<CBaseChainParams>("alpha", 8589, 8591);
     case ChainType::ALPHATESTNET:
-        return std::make_unique<CBaseChainParams>("alphatestnet", 18342, 18344);
+        return std::make_unique<CBaseChainParams>("alphatestnet", 18589, 18591);
     case ChainType::ALPHAREGTEST:
-        return std::make_unique<CBaseChainParams>("alpharegtest", 18453, 18455);
+        return std::make_unique<CBaseChainParams>("alpharegtest", 28589, 28591);
             
     }
     // !ALPHA END
