@@ -215,14 +215,14 @@ public:
         consensus.signet_blocks = false;
         consensus.signet_challenge.clear();
         consensus.nSubsidyHalvingInterval = 210000*5;
-        consensus.BIP34Height = 1; // Always active unless overridden
+        consensus.BIP34Height = 0; // Always active
         consensus.BIP34Hash = uint256();
-        consensus.BIP65Height = 1;  // Always active unless overridden
-        consensus.BIP66Height = 1;  // Always active unless overridden
-        consensus.CSVHeight = 1;    // Always active unless overridden
-        consensus.SegwitHeight = 0; // Always active unless overridden
+        consensus.BIP65Height = 0;  // Always active
+        consensus.BIP66Height = 0;  // Always active
+        consensus.CSVHeight = 0;    // Always active
+        consensus.SegwitHeight = 0; // Always active
         consensus.MinBIP9WarningHeight = 0;
-        consensus.powLimit = uint256S("00007fffff000000000000000000000000000000000000000000000000000000");
+        consensus.powLimit = uint256S("000fffff00000000000000000000000000000000000000000000000000000000");
         consensus.nPowTargetTimespan = 14 * 24 * 60 * 60 / 5; // two weeks
         consensus.nPowTargetSpacing = 2 * 60;
         consensus.fPowAllowMinDifficultyBlocks = true;
@@ -267,7 +267,7 @@ public:
 
         consensus.fAlphaEnabled = true;
         consensus.nRandomXEpochDuration = 7 * 24 * 60 * 60;     // one week
-        genesis = CreateAlphaGenesisBlock(1296688602, 6107, 0x1e7fffff, 1, 10 * COIN);
+        genesis = CreateAlphaGenesisBlock(1727055357, 132906, 0x1e7fffff, 1, 10 * COIN);
 //      genesis.hashRandomX = uint256S("e848dddfb604a4b1783c8a38b6db5179ccd6911331f2be18bfec02522d95af86");
         consensus.hashGenesisBlock = genesis.GetHash();
 //      assert(consensus.hashGenesisBlock == uint256S("0x6ed227489a38c8e66c6c41ad947998c8594d2708454630fd8df45cbc93b4aebb"));
