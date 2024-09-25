@@ -89,7 +89,7 @@ The compiled executables will be found in `depends/x86_64-pc-linux-gnu/bin/` and
 Install xcode and brew (see instructions here 
 [OSX build instructions](build-osx.md).
 
-`brew install git automake libtool pkg-confg cmake bison`
+`brew install git automake libtool pkg-config cmake bison`
 
 
 download the latest version of Alpha 
