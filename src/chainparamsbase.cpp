@@ -1,7 +1,7 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2009-2021 The Bitcoin Core developers
 // Copyright (c) 2024 The Scash developers
-// Copyright (c) 2024 Makoto Sakuyama
+// Copyright (c) 2024 The Unicity developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -70,7 +70,7 @@ std::unique_ptr<CBaseChainParams> CreateBaseChainParams(const ChainType chain)
     case ChainType::REGTEST:
         return std::make_unique<CBaseChainParams>("btcregtest", 18443, 18445);
             
-/*
+
     case ChainType::SCASHMAIN:
         return std::make_unique<CBaseChainParams>("scash", 8342, 8344);
     case ChainType::SCASHTESTNET:
@@ -79,7 +79,7 @@ std::unique_ptr<CBaseChainParams> CreateBaseChainParams(const ChainType chain)
         return std::make_unique<CBaseChainParams>("scashregtest", 18453, 18455);
     // !SCASH END
 
-*/
+
     // !ALPHA
     case ChainType::ALPHAMAIN:
         return std::make_unique<CBaseChainParams>("alpha", 8589, 8591);

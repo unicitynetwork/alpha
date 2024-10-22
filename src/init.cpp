@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2022 The Bitcoin Core developers
 // Copyright (c) 2024 The Scash developers
-// Copyright (c) 2024 Makoto Sakuyama
+// Copyright (c) 2024 The Unicity developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -464,7 +464,7 @@ void SetupServerArgs(ArgsManager& argsman)
     const auto signetChainParams = CreateChainParams(argsman, ChainType::SIGNET);
     const auto regtestChainParams = CreateChainParams(argsman, ChainType::REGTEST);
 
-/*
+
     // !SCASH
     const auto scashRegtestBaseParams = CreateBaseChainParams(ChainType::SCASHREGTEST);
     const auto scashTestnetBaseParams = CreateBaseChainParams(ChainType::SCASHTESTNET);
@@ -473,7 +473,7 @@ void SetupServerArgs(ArgsManager& argsman)
     const auto scashTestnetChainParams = CreateChainParams(argsman, ChainType::SCASHTESTNET);
     const auto scashMainChainParams = CreateChainParams(argsman, ChainType::SCASHMAIN);
     // !SCASH END
-*/
+
     
     // !ALPHA
     const auto alphaRegtestBaseParams = CreateBaseChainParams(ChainType::ALPHAREGTEST);
@@ -1086,7 +1086,7 @@ bool AppInitParameterInteraction(const ArgsManager& args)
             return InitError(util::ErrorString(blockman_result));
         }
     }
-/*
+
     // !SCASH
     if (chain == ChainType::SCASHMAIN || chain == ChainType::SCASHREGTEST || chain == ChainType::SCASHTESTNET) {
         if (args.GetBoolArg("-mempoolfullrbf", DEFAULT_MEMPOOL_FULL_RBF)) {
@@ -1104,7 +1104,6 @@ bool AppInitParameterInteraction(const ArgsManager& args)
         }
     }
     // !SCASH END
-*/
     
     // !ALPHA
     if (chain == ChainType::ALPHAMAIN || chain == ChainType::ALPHAREGTEST || chain == ChainType::ALPHATESTNET) {
@@ -1178,11 +1177,11 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
 {
     const ArgsManager& args = *Assert(node.args);
     const CChainParams& chainparams = Params();
-
-    // !ALPHA
-    if (chainparams.GetConsensus().fAlphaEnabled) {
-        g_isAlpha = true;
-        LogPrintf("%s: Alpha RandomX proof-of-work active\n", __func__);
+    
+    // !SCASH
+    if (chainparams.GetConsensus().fPowRandomX) {
+        g_isRandomX = true;
+        LogPrintf("%s:  RandomX proof-of-work active\n", __func__);
         randomx_flags flags = randomx_get_flags();
         if (flags & RANDOMX_FLAG_ARGON2_AVX2) {
             LogPrintf("- Argon2 implementation: AVX2\n");
@@ -1207,7 +1206,17 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
             LogPrintf("- light memory mode (256 MiB)\n");
         }
     }
-    // !ALPHA END
+    // !SCASH END
+
+    // !ALPHA
+    if (chainparams.GetConsensus().fAlphaEnabled) {
+        g_isAlpha = true;
+        LogPrintf("%s: Alpha active\n", __func__);
+    }
+    // !ALPHA END 
+        
+    assert(!(g_isAlpha && !g_isRandomX) && "g_isAlpha cannot be true if g_isRandomX is false");
+
 
     auto opt_max_upload = ParseByteUnits(args.GetArg("-maxuploadtarget", DEFAULT_MAX_UPLOAD_TARGET), ByteUnit::M);
     if (!opt_max_upload) {

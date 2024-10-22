@@ -439,6 +439,12 @@ private:
             return " btcregtest";
         case ChainType::MAIN:
             return " btc";
+        case ChainType::SCASHTESTNET:
+            return " scashtestnet";
+        case ChainType::SCASHREGTEST:
+            return " scashregtest";
+        case ChainType::SCASHMAIN:
+            return " scash";
         case ChainType::ALPHATESTNET:
             return " alphatestnet";
         case ChainType::ALPHAREGTEST:

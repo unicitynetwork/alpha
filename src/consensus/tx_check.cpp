@@ -1,5 +1,5 @@
 // Copyright (c) 2017-2021 The Bitcoin Core developers
-// Copyright (c) 2024 Makoto Sakuyama
+// Copyright (c) 2024 The Unicity developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 

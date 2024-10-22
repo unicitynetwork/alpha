@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2022 The Bitcoin Core developers
 // Copyright (c) 2024 The Scash developers
-// Copyright (c) 2024 Makoto Sakuyama
+// Copyright (c) 2024 The Unicity developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -13,10 +13,13 @@
 #include <uint256.h>
 #include <util/time.h>
 
+// !SCASH
+extern bool g_isRandomX;
+extern bool g_isIBDFinished;
+// !SCASH END
+
 // !ALPHA
 extern bool g_isAlpha;
-extern bool g_isIBDFinished;
-
 
 //g_Rx_versionbit is a hack as we need to know inside a block header
 //if it is a RandomX block or not. Since Versionbits was introduced
@@ -54,15 +57,18 @@ public:
     SERIALIZE_METHODS(CBlockHeader, obj) { 
         READWRITE(obj.nVersion, obj.hashPrevBlock, obj.hashMerkleRoot, obj.nTime, obj.nBits, obj.nNonce);
         
-        // !SCASH
-//        if (g_isRandomX) {
-//            READWRITE(obj.hashRandomX);
-//        }
-        // !SCASH END
+
         
         // !ALPHA
-        if ((obj.nVersion & (1 << g_Rx_versionbit)) != 0)
+        if (g_isAlpha)
+        {
+            if ((obj.nVersion & (1 << g_Rx_versionbit)) != 0)
+                READWRITE(obj.hashRandomX);
+        }
+        else if (g_isRandomX)
+        {
             READWRITE(obj.hashRandomX);
+        }
         // !ALPHA END
     }
 

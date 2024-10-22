@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2022 The Bitcoin Core developers
 // Copyright (c) 2024 The Scash developers
-// Copyright (c) 2024 Makoto Sakuyama
+// Copyright (c) 2024 The Unicity developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -436,19 +436,24 @@ public:
         READWRITE(obj.nTime);
         READWRITE(obj.nBits);
         READWRITE(obj.nNonce);
-        // !SCASH 
-//        if (g_isRandomX) {
-//        if(obj.nVersion > 1){
-//        if ((obj.nVersion & (1 << g_Rx_versionbit)) != 0){
-//            READWRITE(obj.hashRandomX);
-//        }
-        // !SCASH END
-        
+
+                
         // !ALPHA
-        if ((obj.nVersion & (1 << g_Rx_versionbit)) != 0){
-            READWRITE(obj.hashRandomX);
+        assert(!(g_isAlpha && !g_isRandomX) && "g_isAlpha cannot be true if g_isRandomX is false");
+        if (g_isRandomX)
+        {
+            if (g_isAlpha)
+            {
+                if ((obj.nVersion & (1 << g_Rx_versionbit)) != 0){
+                    READWRITE(obj.hashRandomX);
+                }
+                
+            }
+            else
+            {
+                READWRITE(obj.hashRandomX);
+            }
         }
-        // !ALPHA END
     }
 
     uint256 ConstructBlockHash() const

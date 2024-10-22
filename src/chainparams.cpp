@@ -1,7 +1,7 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2009-2022 The Bitcoin Core developers
 // Copyright (c) 2024 The Scash developers
-// Copyright (c) 2024 Makoto Sakuyama
+// Copyright (c) 2024 The Unicity developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -126,7 +126,6 @@ std::unique_ptr<const CChainParams> CreateChainParams(const ArgsManager& args, c
         return CChainParams::RegTest(opts);
     }
 
-/*
     // !SCASH
     case ChainType::SCASHREGTEST: {
         auto opts = CChainParams::RegTestOptions{};
@@ -140,7 +139,7 @@ std::unique_ptr<const CChainParams> CreateChainParams(const ArgsManager& args, c
         return CChainParams::ScashMain();
     }
     // !SCASH END
-*/
+
     // !ALPHA
     case ChainType::ALPHAREGTEST: {
         auto opts = CChainParams::RegTestOptions{};

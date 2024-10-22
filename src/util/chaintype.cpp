@@ -1,6 +1,6 @@
 // Copyright (c) 2023 The Bitcoin Core developers
 // Copyright (c) 2024 The Scash developers
-// Copyright (c) 2024 Makoto Sakuyama
+// Copyright (c) 2024 The Unicity developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -22,12 +22,12 @@ std::string ChainTypeToString(ChainType chain)
     case ChainType::REGTEST:
         return "regtest";
     // !SCASH
-//    case ChainType::SCASHMAIN:
-//        return "scash";
-//    case ChainType::SCASHTESTNET:
-//        return "scashtestnet";
-//    case ChainType::SCASHREGTEST:
-//        return "scashregtest";
+    case ChainType::SCASHMAIN:
+        return "scash";
+    case ChainType::SCASHTESTNET:
+        return "scashtestnet";
+    case ChainType::SCASHREGTEST:
+        return "scashregtest";
     // !SCASH END
             
     // !ALPHA
@@ -55,12 +55,12 @@ std::optional<ChainType> ChainTypeFromString(std::string_view chain)
     } else if (chain == "regtest") {
         return ChainType::REGTEST;
     // !SCASH
-//    } else if (chain == "scash") {
-//        return ChainType::SCASHMAIN;
-//    } else if (chain == "scashtestnet") {
-//        return ChainType::SCASHTESTNET;
-//    } else if (chain == "scashregtest") {
-//        return ChainType::SCASHREGTEST;
+    } else if (chain == "scash") {
+        return ChainType::SCASHMAIN;
+    } else if (chain == "scashtestnet") {
+        return ChainType::SCASHTESTNET;
+    } else if (chain == "scashregtest") {
+        return ChainType::SCASHREGTEST;
     // !SCASH END
         
     // !ALPHA

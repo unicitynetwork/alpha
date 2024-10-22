@@ -163,6 +163,8 @@ BOOST_AUTO_TEST_CASE(blockmanager_flush_block_file)
     // Write second block
     FlatFilePos pos2{blockman.SaveBlockToDisk(block2, /*nHeight=*/2, /*dbp=*/nullptr)};
 
+    int i =TEST_BLOCK_SIZE + BLOCK_SERIALIZATION_HEADER_SIZE;
+    
     // Two blocks in the file
     BOOST_CHECK_EQUAL(blockman.CalculateCurrentUsage(), (TEST_BLOCK_SIZE + BLOCK_SERIALIZATION_HEADER_SIZE) * 2);
 

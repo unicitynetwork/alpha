@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2022 The Bitcoin Core developers
 // Copyright (c) 2024 The Scash developers
-// Copyright (c) 2024 Makoto Sakuyama
+// Copyright (c) 2024 The Unicity developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -169,12 +169,12 @@ std::list<SectionInfo> ArgsManager::GetUnrecognizedSections() const
         ChainTypeToString(ChainType::ALPHATESTNET),
         ChainTypeToString(ChainType::ALPHAMAIN),
         // !ALPHA END
-/*
+
         ChainTypeToString(ChainType::REGTEST),
         ChainTypeToString(ChainType::SIGNET),
         ChainTypeToString(ChainType::TESTNET),
         ChainTypeToString(ChainType::MAIN),
-*/
+
     };
 
     LOCK(cs_args);
@@ -782,9 +782,9 @@ std::variant<ChainType, std::string> ArgsManager::GetChainArg() const
     const bool fTestNet = get_net("-testnet");
     const auto chain_arg = GetArg("-chain");
 
- //   if ((int)chain_arg.has_value() + (int)fRegTest + (int)fSigNet + (int)fTestNet > 1) {
- //       throw std::runtime_error("Invalid combination of -regtest, -signet, -testnet and -chain. Can use at most one.");
- //   }
+    if ((int)chain_arg.has_value() + (int)fRegTest + (int)fSigNet + (int)fTestNet > 1) {
+        throw std::runtime_error("Invalid combination of -regtest, -signet, -testnet and -chain. Can use at most one.");
+    }
     if (chain_arg) {
         if (auto parsed = ChainTypeFromString(*chain_arg)) return *parsed;
         // Not a known string, so return original string
@@ -798,21 +798,26 @@ std::variant<ChainType, std::string> ArgsManager::GetChainArg() const
     const bool fAlphaMain = get_net("-alpha");
     const bool fAlphaRegTest = get_net("-alpharegtest");
     const bool fAlphaTestnet = get_net("-alphatestnet");
+    
+    const bool fScashMain = get_net("-scash");
+    const bool fScashRegTest = get_net("-scashregtest");
+    const bool fScashTestnet = get_net("-scashtestnet");
 
-    if ((int)chain_arg.has_value() + (int)fAlphaMain + (int)fAlphaTestnet + (int)fAlphaRegTest + (int)fRegTest + (int)fSigNet + (int)fTestNet > 1) {
-        throw std::runtime_error("Invalid combination of -alpha, -alpharegtest, -alphatestnet, -regtest, -signet, -testnet and -chain. Can use at most one.");
+    if ((int)chain_arg.has_value() + (int)fScashMain + (int)fScashTestnet + (int)fScashRegTest + (int)fAlphaMain + (int)fAlphaTestnet + (int)fAlphaRegTest + (int)fRegTest + (int)fSigNet + (int)fTestNet> 1) {
+        throw std::runtime_error("Invalid combination of -alpha, -alpharegtest, -alphatestnet, -scash -scashregtest -scashtestnet -regtest, -signet, -testnet and -chain. Can use at most one.");
     }
 
     if (fAlphaMain) return ChainType::ALPHAMAIN;
     if (fAlphaRegTest) return ChainType::ALPHAREGTEST;
     if (fAlphaTestnet) return ChainType::ALPHATESTNET;
+    if (fScashMain) return ChainType::SCASHMAIN;
+    if (fScashRegTest) return ChainType::SCASHREGTEST;
+    if (fScashTestnet) return ChainType::SCASHTESTNET;
+
 
     if (fExecutableNamedAlpha) return ChainType::ALPHAMAIN;
     // !ALPHA END
     
-    
-    //TODO for now no reason to run BTC
-    throw std::runtime_error("attempting to run BTC");
     return ChainType::MAIN;
 }
 

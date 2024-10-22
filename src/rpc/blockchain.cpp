@@ -1,7 +1,7 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2009-2022 The Bitcoin Core developers
 // Copyright (c) 2024 The Scash developers
-// Copyright (c) 2024 Makoto Sakuyama
+// Copyright (c) 2024 The Unicity developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -88,8 +88,16 @@ double GetDifficulty(const CBlockIndex& blockindex)
 //    double dDiff =
 //        (double)0x0000ffff / (double)(blockindex.nBits & 0x00ffffff);
     
-    double dDiff =
-        (double)0x000fffff / (double)(blockindex.nBits & 0x00ffffff);
+    double dDiff;
+    
+    if (g_isAlpha)
+    {
+        dDiff = (double)0x000fffff / (double)(blockindex.nBits & 0x00ffffff);
+    }
+    else
+    {
+        dDiff = (double)0x0000ffff / (double)(blockindex.nBits & 0x00ffffff);
+    }
 
 // !ALPHA END
     
@@ -173,11 +181,23 @@ UniValue blockheaderToJSON(const CBlockIndex& tip, const CBlockIndex& blockindex
         result.pushKV("nextblockhash", pnext->GetBlockHash().GetHex());
 
     // !ALPHA
-    if ((blockindex.nVersion & (1 << g_Rx_versionbit)) != 0) {
+    
+    if (g_isAlpha)
+    {
+        if ((blockindex.nVersion & (1 << g_Rx_versionbit)) != 0) {
+            result.pushKV("rx_epoch", GetEpoch(blockindex.nTime, Params().GetConsensus().nRandomXEpochDuration));
+            result.pushKV("rx_hash", blockindex.hashRandomX.GetHex());
+            result.pushKV("rx_cm", GetRandomXCommitment(blockindex.GetBlockHeader()).GetHex());
+        }
+    }
+    else if (g_isRandomX)
+    {
         result.pushKV("rx_epoch", GetEpoch(blockindex.nTime, Params().GetConsensus().nRandomXEpochDuration));
         result.pushKV("rx_hash", blockindex.hashRandomX.GetHex());
         result.pushKV("rx_cm", GetRandomXCommitment(blockindex.GetBlockHeader()).GetHex());
     }
+    
+
     // !ALPHA END
 
     return result;

@@ -1,6 +1,6 @@
 // Copyright (c) 2012-2022 The Bitcoin Core developers
 // Copyright (c) 2024 The Scash developers
-// Copyright (c) 2024 Makoto Sakuyama
+// Copyright (c) 2024 The Unicity developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -96,7 +96,7 @@ std::string CopyrightHolders(const std::string& strPrefix)
 
     // !SCASH
     if (copyright_devs.find("alpha") == std::string::npos) {
-        strCopyrightHolders += "\nCopyright (C) 2024 The Scash developers\nCopyright (C) 2024 Makoto Sakuyama\n ";
+        strCopyrightHolders += "\nCopyright (C) 2024 The Scash developers\nCopyright (C) 2024 The Unicity developers\n ";
     }
     // !SCASH END
     return strCopyrightHolders;

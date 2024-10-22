@@ -1,7 +1,7 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2009-2021 The Bitcoin Core developers
 // Copyright (c) 2024 The Scash developers
-// Copyright (c) 2024 Makoto Sakuyama
+// Copyright (c) 2024 The Unicity developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -81,12 +81,6 @@ public:
         consensus.nSubsidyHalvingInterval = 210000*5;  // keep the same halving time as BTC (5x the number of blocks)
         
         
-//        consensus.BIP34Height = 100000; // Always active unless overridden
-//        consensus.BIP34Hash = uint256();
-//        consensus.BIP65Height = 100000;  // Always active unless overridden
-//        consensus.BIP66Height = 100000;  // Always active unless overridden
-//        consensus.CSVHeight = 100000;    // Always active unless overridden
-//        consensus.SegwitHeight = 100000; // Always active unless overridden
        
         consensus.BIP34Height = 70228;
         consensus.BIP34Hash = uint256();
@@ -153,6 +147,7 @@ public:
         };
 
 
+        consensus.fPowRandomX = true;
         consensus.fAlphaEnabled = true;
         consensus.nRandomXEpochDuration = 7 * 24 * 60 * 60;     // one week
         
@@ -183,6 +178,7 @@ public:
                   { 10000, uint256S("0x00000006de7ea8bbc408e0b0d92aca299182df06720bf6d0f2551ebdc001752f")},
                   { 50000, uint256S("0x000000003bcc759fd72afe7349581dc724845841a4fa0db85c3283136f22858a")},
                   { 60000, uint256S("0x000000002506435a08bf9b2470533527983ff2ec43810b92153a1b49c571d375")},
+                  { 100000, uint256S("0x494afaa8539a144da066b9c2e09dfa78dc716e7a9a14f229d1eaa09c7d391fc3")},
             }
         };
 
@@ -265,6 +261,7 @@ public:
         m_assumed_blockchain_size = 0;
         m_assumed_chain_state_size = 0;
 
+        consensus.fPowRandomX = true;
         consensus.fAlphaEnabled = true;
         consensus.nRandomXEpochDuration = 7 * 24 * 60 * 60;     // one week
         genesis = CreateAlphaGenesisBlock(1727055357, 132906, 0x1e7fffff, 1, 10 * COIN);
@@ -343,8 +340,6 @@ public:
         consensus.nMinimumChainWork = uint256{};
         consensus.defaultAssumeValid = uint256{};
 
-        
-        //TODO
         pchMessageStart[0] = 0xc9;
         pchMessageStart[1] = 0xa4;
         pchMessageStart[2] = 0xae;
@@ -365,7 +360,7 @@ public:
         };
 */
 
-        
+        consensus.fPowRandomX = true;
         consensus.fAlphaEnabled = true;
         consensus.nRandomXEpochDuration = 24 * 60 * 60;     // one day
         
@@ -947,9 +942,6 @@ std::unique_ptr<const CChainParams> CChainParams::TestNet()
     return std::make_unique<const CTestNetParams>();
 }
 
-
-
-/*
 // !SCASH
 
 // Compute block hash over entire header (including RandomX fields) even if global flag is not set
@@ -967,7 +959,9 @@ static CBlock CreateScashGenesisBlock(uint32_t nTime, uint32_t nNonce, uint32_t 
     return CreateGenesisBlock(pszTimestamp, genesisOutputScript, nTime, nNonce, nBits, nVersion, genesisReward);
 }
 
-
+/**
+ * Main network on which people trade goods and services.
+ */
 
 class CScashMainParams : public CChainParams {
 public:
@@ -1014,8 +1008,13 @@ public:
             0x1c7b9d90,   // anchor block nBits
             1712987784,   // anchor block previous block timestamp
         };
-        
-    
+
+        /**
+         * The message start string is designed to be unlikely to occur in normal data.
+         * The characters are rarely used upper ASCII, not valid as UTF-8, and produce
+         * a large 32-bit integer with any alignment.
+         */
+
         pchMessageStart[0] = 0xfa;
         pchMessageStart[1] = 0xbf;
         pchMessageStart[2] = 0xb5;
@@ -1067,6 +1066,12 @@ public:
         };
     }
 };
+
+
+/**
+ * Testnet: public test network which is reset from time to time.
+ */
+
 
 class CScashTestNetParams : public CChainParams {
 public:
@@ -1160,6 +1165,11 @@ public:
         };
     }
 };
+
+/**
+ * Regression test: intended for private networks only. Has minimal difficulty to ensure that
+ * blocks can be found instantly.
+ */
 
 
 class CScashRegTestParams : public CChainParams
@@ -1288,6 +1298,5 @@ std::unique_ptr<const CChainParams> CChainParams::ScashMain()
 
 // !SCASH END
 
-*/
 
 

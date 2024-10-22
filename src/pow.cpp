@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2022 The Bitcoin Core developers
 // Copyright (c) 2024 The Scash developers
-// Copyright (c) 2024 Makoto Sakuyama
+// Copyright (c) 2024 The Unicity developers
 
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -281,7 +281,8 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
     
     // !ALPHA
     //When the blockheight is RandomXHeight (70,228) we reduce the difficulty by RandomX_DiffMult (100,000)
-    if (pindexLast->nHeight + 1 == params.RandomXHeight)
+        
+    if (g_isAlpha &&  (pindexLast->nHeight + 1 == params.RandomXHeight))
     {
         arith_uint256 bnPrevDiff;
         bnPrevDiff.SetCompact(pindexLast->nBits);
@@ -297,6 +298,7 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
         
         return nBitsNew;
     }
+    
     // !ALPHA END
 
 
@@ -338,14 +340,13 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
     // !SCASH
     // Fix legacy Bitcoin off-by-one retargeting bug to prevent a time warp attack.
     // Difficulty is now correctly calculated over block intervals which overlap.
-    //int nHeightFirst = (g_isRandomX) ? std::max(0, pindexLast->nHeight - (int)params.DifficultyAdjustmentInterval()) :
-    //                                   pindexLast->nHeight - (params.DifficultyAdjustmentInterval() - 1);
+    int nHeightFirst = (g_isRandomX) ? std::max(0, pindexLast->nHeight - (int)params.DifficultyAdjustmentInterval()) :
+                                       pindexLast->nHeight - (params.DifficultyAdjustmentInterval() - 1);
     // !SCASH END
 
-    
     // !ALPHA
     // Keep the legacy Bitcoin calculation
-    int nHeightFirst = pindexLast->nHeight - ((int)params.DifficultyAdjustmentInterval() - 1);
+    if (g_isAlpha) nHeightFirst = pindexLast->nHeight - ((int)params.DifficultyAdjustmentInterval() - 1);
     // !ALPHA END
 
     assert(nHeightFirst >= 0);
@@ -470,7 +471,9 @@ bool CheckProofOfWork(uint256 hash, unsigned int nBits, const Consensus::Params&
 
 // !ALPHA
 // Seed string contains an epoch integer and is sha256d hashed to derive the seed hash (RandomX key).
-static const char *RANDOMX_EPOCH_SEED_STRING = "Alpha/RandomX/Epoch/%d";
+static const char *RANDOMX_EPOCH_SEED_STRING = "Scash/RandomX/Epoch/%d";
+static const char *RANDOMX_EPOCH_SEED_STRING_ALPHA = "Alpha/RandomX/Epoch/%d";
+
 // !ALPHA END
 
 // Epoch is Unix time stamp in seconds divided by epoch duration in seconds.
@@ -481,7 +484,13 @@ uint32_t GetEpoch(uint32_t nTimestamp, uint32_t nDuration) {
 // Compute seed hash (the RandomX key) for an epoch. Applies sha256d to the seed string.
 uint256 GetSeedHash(uint32_t nEpoch)
 {
-    std::string s = strprintf(RANDOMX_EPOCH_SEED_STRING, nEpoch);
+    std::string s;
+    if (g_isAlpha)
+         s = strprintf(RANDOMX_EPOCH_SEED_STRING_ALPHA, nEpoch);
+    else
+         s = strprintf(RANDOMX_EPOCH_SEED_STRING, nEpoch);
+    
+    
     uint256 h1, h2;
     CSHA256().Write((const unsigned char*)s.data(), s.size()).Finalize(h1.begin());
     CSHA256().Write(h1.begin(), 32).Finalize(h2.begin());
@@ -630,13 +639,23 @@ uint256 GetRandomXCommitment(const CBlockHeader& block, uint256 *inHash) {
  */
 bool CheckProofOfWorkRandomX(const CBlockHeader& block, const Consensus::Params& params, POWVerifyMode verifyMode, uint256 *outHash)
 {
+  
+    // Legacy chains continue to use original sha256d PoW
+    if (!params.fPowRandomX)
+        return CheckProofOfWork(block.GetHash(), block.nBits, params);
+    
     // !ALPHA
     // Check if the block randomx bit is set
-    bool fRandomX_block = (block.nVersion & (1 << g_Rx_versionbit)) != 0;
     
-    if (block.nVersion == 1 || !fRandomX_block)
-        return CheckProofOfWork(block.GetHash(), block.nBits, params);
-    // !ALPHA END
+    if (g_isAlpha)
+    {
+        bool fRandomX_block = (block.nVersion & (1 << g_Rx_versionbit)) != 0;
+        
+        //if nVersion is 1 then the original chain using sha256d
+        if (block.nVersion == 1 || !fRandomX_block)
+            return CheckProofOfWork(block.GetHash(), block.nBits, params);
+        // !ALPHA END
+    }
     
     unsigned int nBits = block.nBits;
 

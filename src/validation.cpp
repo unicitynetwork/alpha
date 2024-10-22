@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2022 The Bitcoin Core developers
 // Copyright (c) 2024 The Scash developers
-// Copyright (c) 2024 Makoto Sakuyama
+// Copyright (c) 2024 The Unicity developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -77,10 +77,13 @@
 #include <tuple>
 #include <utility>
 
-// !ALPHA
+// !SCASH
 #include <common/args.h>
-#include <interfaces/node.h>
 #include <node/interface_ui.h>
+// !SCASH END
+
+// !ALPHA
+#include <interfaces/node.h>
 // !ALPHA END
 
 using kernel::CCoinsStats;
@@ -763,12 +766,12 @@ bool MemPoolAccept::PreChecks(ATMPArgs& args, Workspace& ws)
         const CTransaction* ptxConflicting = m_pool.GetConflictTx(txin.prevout);
         if (ptxConflicting) {
 
-            // !ALPHA
+            // !SCASH
             // First-seen rule to reject conflicting transactions (legacy behaviour disables RBF).
-            if (g_isAlpha) {
+            if (g_isRandomX) {
                 return state.Invalid(TxValidationResult::TX_MEMPOOL_POLICY, "txn-mempool-conflict");
             }
-            // !ALPHA END
+            // !SCASH END
 
             if (!args.m_allow_replacement) {
                 // Transaction conflicts with a mempool tx, but we're not allowing replacements.
@@ -1070,9 +1073,9 @@ bool MemPoolAccept::PolicyScriptChecks(const ATMPArgs& args, Workspace& ws)
     const CTransaction& tx = *ws.m_ptx;
     TxValidationState& state = ws.m_state;
 
-    // !ALPHA
-    const unsigned int scriptVerifyFlags = STANDARD_SCRIPT_VERIFY_FLAGS | (g_isAlpha ? SCRIPT_VERIFY_DISCOURAGE_ORDINALS : 0);
-    // !ALPHA END
+    // !SCASH
+    const unsigned int scriptVerifyFlags = STANDARD_SCRIPT_VERIFY_FLAGS | (g_isRandomX ? SCRIPT_VERIFY_DISCOURAGE_ORDINALS : 0);
+    // !SCASH END
 
     // Check input scripts and signatures.
     // This is done last to help prevent CPU exhaustion denial-of-service attacks.
@@ -1712,9 +1715,14 @@ CAmount GetBlockSubsidy(int nHeight, const Consensus::Params& consensusParams)
     // Force block reward to zero when right shift is undefined.
     if (halvings >= 64)
         return 0;
+    
+    
 // !ALPHA
-//    CAmount nSubsidy = 50 * COIN;
-    CAmount nSubsidy = 10 * COIN;
+    CAmount nSubsidy;
+    if (g_isAlpha)
+        nSubsidy = 10 * COIN;
+    else
+        nSubsidy = 50 * COIN;
 // !ALPHA END
 
     // Subsidy is cut in half every 210,000 blocks which will occur approximately every 4 years.
@@ -3133,9 +3141,9 @@ bool Chainstate::ActivateBestChainStep(BlockValidationState& state, CBlockIndex*
     const CBlockIndex* pindexOldTip = m_chain.Tip();
     const CBlockIndex* pindexFork = m_chain.FindFork(pindexMostWork);
 
-    // !ALPHA
+    // !SCASH
     // If reorg length is suspicious, don't activate best chain, just log error and shut down. Let human operator decide what to do.
-    if (g_isAlpha && pindexOldTip && pindexFork) {
+    if (g_isRandomX && pindexOldTip && pindexFork) {
         int suspiciousDepth = gArgs.GetIntArg("-suspiciousreorgdepth", DEFAULT_SUSPICIOUS_REORG_DEPTH);
         if (suspiciousDepth > 0) {
             auto reorgLength = pindexOldTip->nHeight - pindexFork->nHeight;
@@ -3151,7 +3159,7 @@ bool Chainstate::ActivateBestChainStep(BlockValidationState& state, CBlockIndex*
             }
         }
     }
-    // !ALPHA END
+    // !SCASH END
 
     // Disconnect active blocks which are no longer in the best chain.
     bool fBlocksDisconnected = false;
@@ -4088,9 +4096,9 @@ bool ChainstateManager::AcceptBlockHeader(const CBlockHeader& block, BlockValida
             return true;
         }
 
-        // !ALPHA
+        // !SCASH
         // Sanity check the pow commitment meets the target (cheap)
-        if (g_isAlpha && !CheckProofOfWorkRandomX(block, GetConsensus(), POW_VERIFY_COMMITMENT_ONLY)) {
+        if (g_isRandomX && !CheckProofOfWorkRandomX(block, GetConsensus(), POW_VERIFY_COMMITMENT_ONLY)) {
             state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "high-hash", "proof of work failed");
             LogPrint(BCLog::VALIDATION, "%s: Consensus::CheckBlockHeader: %s, %s\n", __func__, hash.ToString(), state.ToString());
             return false;
@@ -4099,7 +4107,7 @@ bool ChainstateManager::AcceptBlockHeader(const CBlockHeader& block, BlockValida
             LogPrint(BCLog::VALIDATION, "%s: Consensus::CheckBlockHeader: %s, %s\n", __func__, hash.ToString(), state.ToString());
             return false;
         }
-        // !ALPHA END
+        // !SCASH END
 
         // Get prev block index
         CBlockIndex* pindexPrev = nullptr;
@@ -4121,7 +4129,7 @@ bool ChainstateManager::AcceptBlockHeader(const CBlockHeader& block, BlockValida
         // !SCASH
         // Verify timestamp (and thus the epoch) in contextual check above, before performing full pow verification.
         // This ordering help prevents resource denial when -randomxfastmode=1, as VM creation is based on epoch.
-        if (g_isAlpha && !CheckBlockHeader(block, state, GetConsensus())) {
+        if (g_isRandomX && !CheckBlockHeader(block, state, GetConsensus())) {
             LogPrint(BCLog::VALIDATION, "%s: Consensus::CheckBlockHeader: %s, %s\n", __func__, hash.ToString(), state.ToString());
             return false;
         }

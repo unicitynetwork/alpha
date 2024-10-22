@@ -1,7 +1,7 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2009-2022 The Bitcoin Core developers
 // Copyright (c) 2024 The Scash developers
-// Copyright (c) 2024 Makoto Sakuyama
+// Copyright (c) 2024 The Unicity developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -455,11 +455,11 @@ static RPCHelpMan createrawtransaction()
         rbf = request.params[3].get_bool();
     }
 
-    // !ALPHA
-    if (g_isAlpha && rbf.has_value() && rbf.value()) {
+    // SCASH
+    if (g_isRandomX && rbf.has_value() && rbf.value()) {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "RBF is not supported.");
     }
-    // !ALPHA END
+    // !SCASH END
 
     CMutableTransaction rawTx = ConstructTransaction(request.params[0], request.params[1], request.params[2], rbf);
 

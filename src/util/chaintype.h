@@ -1,6 +1,6 @@
 // Copyright (c) 2023 The Bitcoin Core developers
 // Copyright (c) 2024 The Scash developers
-// Copyright (c) 2024 Makoto Sakuyama
+// Copyright (c) 2024 The Unicity developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -16,9 +16,9 @@ enum class ChainType {
     SIGNET,
     REGTEST,
     // !SCASH
-    // SCASHMAIN,
-    // SCASHTESTNET,
-    // SCASHREGTEST,
+    SCASHMAIN,
+    SCASHTESTNET,
+    SCASHREGTEST,
     // !SCASH END
     
     // !ALPHA

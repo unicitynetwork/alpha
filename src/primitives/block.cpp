@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2019 The Bitcoin Core developers
 // Copyright (c) 2024 The Scash developers
-// Copyright (c) 2024 Makoto Sakuyama
+// Copyright (c) 2024 The Unicity developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -11,9 +11,13 @@
 #include <tinyformat.h>
 
 // !SCASH
-bool g_isAlpha = false;   // global
+bool g_isRandomX = false;   // global
 bool g_isIBDFinished = false;    // global
 // !SCASH END
+
+// !ALPHA
+bool g_isAlpha = false;   // global
+// !ALPHA END
 
 uint256 CBlockHeader::GetHash() const
 {
