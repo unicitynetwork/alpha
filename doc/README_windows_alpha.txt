@@ -1,4 +1,4 @@
-Alphacash
+Alpha
 =====================
 
 Intro
