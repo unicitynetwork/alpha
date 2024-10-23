@@ -7,7 +7,7 @@ Alpha is released under the terms of the MIT license.
 
 
 
-**Abstract**: Alpha i the trust anchor and native currency of Unicity, a platform for building decentralized applications using Verifiable Autonmoous Agents. The Alpha coins replicate the self-verifiability property of physical cash, i.e. the coins are compact, authenticated data structures which can be passed through any medium peer-to-peer, chain-to-chain and verified without bridges or trusted third parties. 
+Alpha is the trust anchor and native currency of Unicity, a platform for building decentralized applications using Verifiable Autonmoous Agents. The Alpha coins replicate the self-verifiability property of physical cash, i.e. the coins are compact, authenticated data structures which can be passed through any medium peer-to-peer, chain-to-chain and verified without bridges or trusted third parties. 
 
 
 The Unicity design is a layered architecture 
