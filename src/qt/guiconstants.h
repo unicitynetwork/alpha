@@ -48,7 +48,7 @@ static const int TOOLTIP_WRAP_THRESHOLD = 80;
 
 // !ALPHA
 #define QAPP_ORG_NAME "Alpha"
-#define QAPP_ORG_DOMAIN "https://github.com/sakuyama2024/alphacash.git"
+#define QAPP_ORG_DOMAIN "https://github.com/unicitynetwork/alpha.git"
 #define QAPP_APP_NAME_DEFAULT "Alpha-Qt"
 #define QAPP_APP_NAME_ALPHA_TESTNET "Alpha-Qt-testnet"
 #define QAPP_APP_NAME_ALPHA_REGTEST "Alpha-Qt-regtest"

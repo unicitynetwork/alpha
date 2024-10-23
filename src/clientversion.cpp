@@ -23,7 +23,7 @@
  * target servers or GUI users specifically.
  */
 // !SCASH
-const std::string CLIENT_NAME("Alphacash");
+const std::string CLIENT_NAME("Alpha");
 // !SCASH END
 
 #ifdef HAVE_BUILD_INFO
@@ -105,7 +105,7 @@ std::string CopyrightHolders(const std::string& strPrefix)
 std::string LicenseInfo()
 {
     // !ALPHA
-    const std::string URL_SOURCE_CODE = "<https://github.com/sakuyama2024/alphacash>";
+    const std::string URL_SOURCE_CODE = "<https://github.com/unicitynetwork/alpha>";
 /*
     return CopyrightHolders(strprintf(_("Copyright (C) %i-%i").translated, 2009, COPYRIGHT_YEAR) + " ") + "\n" +
            "\n" +
@@ -122,7 +122,7 @@ std::string LicenseInfo()
     
     return CopyrightHolders(strprintf("Copyright (C) %i-%i", 2009, COPYRIGHT_YEAR) + " ") + "\n" +
                "\n" +
-               strprintf("Visit <https://github.com/sakuyama2024> for more info.") +
+               strprintf("Visit <https://github.com/unicitynetwork> for more info.") +
                "\n" +
                "This is experimental software." + "\n" +
                strprintf("Distributed under the MIT software license, see the accompanying file %s or %s", "COPYING", "<https://opensource.org/licenses/MIT>") +

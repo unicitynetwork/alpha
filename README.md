@@ -1,33 +1,25 @@
 
-Alphacash
+Alpha
 =====================================
 
 Build instructions here [doc/build-alpha.md](doc/build-alpha.md).
-Alphacash is released under the terms of the MIT license.
+Alpha is released under the terms of the MIT license.
 
 
 
-**Abstract**: Alphacash is a censorship resistant peer-to-peer electronic cash system. Similar to Bitcoin, it uses a fixed emission schedule and longest chain Proof of Work consensus protocol. Unlike Bitcoin it supports unlimited blocksize  without sacrificing security or censorship resistance. The Alphacash coins replicate the self-verifiability property of physical cash, i.e. the coins are compact, authenticated data structures which can be passed through any medium peer-to-peer, chain-to-chain and verified without bridges or trusted third parties. Alphacash completes the Bitcoin vision, functioning as an Internet currency, a medium of exchange and a genuine alternative to physical cash.
-
-Alphacash is designed to the native currency of Unicity, a new blockchain architecture that supports parallel execution of smart contracts. However as a standalone digital currency it has some useful properties:
-
-1. genuine decentralization: zero-premine with ASIC resistant hash function
-2. massively parallel client side execution of smart contracts
-3. perfect privacy 
-4. unlimited throughput
+**Abstract**: Alpha i the trust anchor and native currency of Unicity, a platform for building decentralized applications using Verifiable Autonmoous Agents. The Alpha coins replicate the self-verifiability property of physical cash, i.e. the coins are compact, authenticated data structures which can be passed through any medium peer-to-peer, chain-to-chain and verified without bridges or trusted third parties. 
 
 
-
-The design is a layered architecture 
+The Unicity design is a layered architecture 
 			
 						Proof of Work Trust Anchor
-						Unicity and ZK Aggregation
-						Smart Contracts
+						Proof Aggregation Layer
+						Agent Layer
 
 
-The top layer provides a Proof of Work trust anchor i.e. it mints new coins which can then be extracted and used "off-chain" in the Smart Contract layer.
+The top layer provides a Proof of Work trust anchor i.e. it mints new coins which can then be extracted and used "off-chain" in the Agent layer.
 
-This codebase implements the top layer and uses a fork of Bitcoin (Scash). It is not designed to be a transaction system and 99% of the codebase is redundant - transactions are executed at the smart contract layer not in the Proof of Work layer. Transactions are still needed (coinbase, mining pool shares) but discouraged. 
+This codebase implements the top layer and uses a fork of Bitcoin (Scash). It is not designed to be a transaction system and 99% of the codebase is redundant - transactions are executed at the Agent layer not in the Proof of Work layer. Transactions are still needed (coinbase, mining pool shares) but discouraged. 
 
 The major changes from the Bitcoin codebase
 
@@ -55,7 +47,7 @@ The subsidy is 10 ALPHA with a target block time of 2 minutes. Halving period me
 The Bitcoin Cash implementation of an exponential moving average approach to difficulty adjustments is implemented to theoretically always target a correction toward a 2 minute block time. 
 
 ASERT was initiated on block 70232
-half-life 30 minutes
+half-life 12 hours
 
 
 **GENESIS BLOCK**

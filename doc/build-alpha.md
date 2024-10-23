@@ -28,7 +28,7 @@ g++ --version
 download the latest version of the source code
 
 ```bash
-git clone https://github.com/sakuyama2024/alpha_test1 alpha
+git clone https://github.com/unicitynetwork/alpha
 cd alpha
 ```
 
@@ -95,7 +95,7 @@ Install xcode and brew (see instructions here
 download the latest version of Alpha 
 
 ```bash
-git clone https://github.com/sakuyama2024/alpha_test1 alpha
+git clone https://github.com/unicitynetwork/alpha alpha
 cd alpha
 ```
 
@@ -164,39 +164,29 @@ make deploy
 
 The alpha configuration file is the same as bitcoin.conf.
 
-By default, alpha looks for a configuration file here:
+By default, alpha looks for a configuration file here on linux:
+
 `$HOME/.alpha/alpha.conf`
 
+on Macos:
+
+`$HOME/Library/Application Support/Alpha`
+
+on Windows:
+
+`$HOME/AppData/Roaming/Alpha`
+
 The following is a sample `alpha.conf`.
+
 ```
 rpcuser=user
 rpcpassword=password
-daemon=1
-debug=1
-txindex=1
-
-[alpha]
-adddnsseed=
-
-[alphatestnet]
-adddnsseed=
 ```
 
 ### Connecting to the network
 
 To help find other nodes on the network, a list of fixed seed nodes are hardwired in the code. They may or may not be avaialble.  If you know the IP addresses of a stable node use the `-addnode` and `-seednode` RPC calls.
 
-If you intend to use the same configuration file with multiple networks, the config sections are named as follows:
-
-```
-[btc]
-[btctestnet3]
-[btcsignet]
-[btcregtest]
-[alpha]
-[alpharegtest]
-[alphatestnet]
-```
 
 ## Running a node
 
@@ -255,11 +245,9 @@ randomxfastmode=1
 
 ### Main network and Testnet chain
 
-Mining takes place using [Alphaminer](https://github.com/sakuyama2024/Alphaminer) which is dedicated mining software that connects to the alpha node and retrieves mining jobs via RPC `getblocktemplate`. The 'randomxfastmode' configuration option is not required for the Alpha node, since mining occurs inside `Alphaminer` which always runs in fast mode.
+Mining takes place using [Alphaminer](https://github.com/unicitynetwork/Alphaminer) which is dedicated mining software that connects to the alpha node and retrieves mining jobs via RPC `getblocktemplate`. The 'randomxfastmode' configuration option is not required for the Alpha node, since mining occurs inside `Alphaminer` which always runs in fast mode.
 
-### Mining Pools
 
-Third-party software exists for mining at pools.
 
 
 Getting Help
