@@ -7,7 +7,7 @@ Alpha is released under the terms of the MIT license.
 
 
 
-Alpha is the trust anchor and native currency of Unicity, a platform for building decentralized applications using Verifiable Autonmoous Agents. The Alpha coins replicate the self-verifiability property of physical cash, i.e. the coins are compact, authenticated data structures which can be passed through any medium peer-to-peer, chain-to-chain and verified without bridges or trusted third parties. 
+Alpha is the trust anchor and native currency of Unicity, a platform for building decentralized applications using Verifiable Autonomous Agents. The Alpha coins replicate the self-verifiability property of physical cash, i.e. the coins are compact, authenticated data structures which can be passed through any medium peer-to-peer, chain-to-chain and verified without bridges or trusted third parties. 
 
 
 The Unicity design is a layered architecture 
@@ -28,7 +28,7 @@ The major changes from the Bitcoin codebase
     if (tx.vin.size() != 1)
             return state.Invalid(TxValidationResult::TX_CONSENSUS, "bad-txns-too-many-inputs", "Alpha Transactions must have exactly one input");
 
-This ensures local verifability i.e. each coin sub-ledger can be extracted from the ledger and used off-chain in the smart contract layer.
+This ensures local verifability i.e. each coin sub-ledger can be extracted from the ledger and used off-chain in the agent layer.
 
 **RandomX Hash Function**
 
