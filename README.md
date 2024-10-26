@@ -7,6 +7,7 @@ Alpha is released under the terms of the MIT license.
 
 Latest whitepaper [here.](https://unicitynetwork.github.io/whitepaper/)
 
+Binaries [here.](https://github.com/unicitynetwork/releases)
 
 
 Alpha is the trust anchor and native currency of Unicity, a platform for building decentralized applications using Verifiable Autonomous Agents. The Alpha coins replicate the self-verifiability property of physical cash, i.e. the coins are compact, authenticated data structures which can be passed through any medium peer-to-peer, chain-to-chain and verified without bridges or trusted third parties. 
@@ -19,7 +20,7 @@ The Unicity design is a layered architecture
 						Agent Layer
 
 
-The top layer provides a Proof of Work trust anchor i.e. it mints new coins which can then be extracted and used "off-chain" in the Agent layer.
+The top layer provides a Proof of Work trust anchor - anchoring the second layer and providing new coins through mining which can then be extracted and used off-chain in the Agent layer.
 
 This codebase implements the top layer and uses a fork of Bitcoin (Scash). It is not designed to be a transaction system and 99% of the codebase is redundant - transactions are executed at the Agent layer not in the Proof of Work layer. Transactions are still needed (coinbase, mining pool shares) but discouraged. 
 
@@ -37,7 +38,7 @@ This ensures local verifability i.e. each coin sub-ledger can be extracted from 
 To democratize mining we use the RandomX ASIC resistance hash function as used in Monero https://github.com/tevador/RandomX 
 
 The hashing algorithm switched from SHA25D to RandomX on block 70228
-Difficulty was reduced by a factor of 100,000
+Difficulty was automatically reduced by a factor of 100,000 on this block to account for the hash rate difference between SHA256 and RandomX.
 
 
 **10 ALPHA subsidy and 2 minute block time**
