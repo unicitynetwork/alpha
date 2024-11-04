@@ -26,7 +26,8 @@ You can check with
 g++ --version
 ```
 If g++ version is less than 10, do
-```
+```bash
+sudo apt install g++-10
 sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-10 20
 sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-10 20
 sudo update-alternatives --config gcc
