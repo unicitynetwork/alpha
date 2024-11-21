@@ -230,20 +230,6 @@ There are a few ways to mine Alpha.
 
 ### Testnet and Regtest chain
 
-Mining takes place inside the alpha node, using the RPC `generatetoaddress` which is single-threaded. For example:
-```bash
-alpha-cli createwallet myfirstwallet
-alpha-cli getnewaddress
-alpha-cli generatetoaddress 1 newminingaddress 10000
-```
-
-To speed up mining in the alpha node, at the expense of using more memory (at least 2GB more), enable the option `randomxfastmode` by adding to the `alpha.conf` configuration file:
-
-```
-randomxfastmode=1
-```
-
-### Main network and Testnet chain
 
 Mining takes place using [Alphaminer](https://github.com/unicitynetwork/Alphaminer) which is dedicated mining software that connects to the alpha node and retrieves mining jobs via RPC `getblocktemplate`. The 'randomxfastmode' configuration option is not required for the Alpha node, since mining occurs inside `Alphaminer` which always runs in fast mode.
 
