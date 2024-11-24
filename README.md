@@ -3,13 +3,14 @@ Alpha
 =====================================
 Alpha is released under the terms of the MIT license.
 
-Build instructions here [doc/build-alpha.md](doc/build-alpha.md).
+Build instructions here [alpha/build-alpha.md](doc/build-alpha.md).
 
 
 Latest whitepaper [here.](https://unicitynetwork.github.io/whitepaper/)
 Binaries [here.](https://github.com/unicitynetwork/releases) Block Explorer [here.](https://www.unicity.network) Mining Instructions [here.](https://https://github.com/unicitynetwork/alpha-miner)
 
 Community address: 
+
 ```
 alpha1qmmqcy66tyjfq5rgngxk4p2r34y9ny7cnnfq3wmfw8fyx03yahxkq0ck3kh
 ```
@@ -68,9 +69,9 @@ Script: "Financial Times 25/May/2024 What went wrong with capitalism"
 Time Sun Jun 16 07:54:52 UTC 2024
 nBits: 0x1d0fffff
 
+**PROGRAMMATIC HARD FORKS**
 
-
-
+Chain is upgraded with a hard fork every 50,000 blocks
 
 
 
