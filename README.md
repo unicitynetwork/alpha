@@ -3,7 +3,7 @@ Alpha
 =====================================
 Alpha is released under the terms of the MIT license.
 
-Build instructions here [alpha/build-alpha.md](doc/build-alpha.md).
+Build instructions [here](alpha/build-alpha.md).
 
 
 Latest whitepaper [here.](https://unicitynetwork.github.io/whitepaper/)
