@@ -28,6 +28,15 @@ get_block_height() {
     alpha-cli -rpcwallet="$WALLET" getblockcount
 }
 
+# Initialize counters
+tx_count=0
+processed_count=0
+skipped_count=0
+current_block=$(get_block_height)
+last_processed_block=$current_block
+
+
+
 # Function to get all unspent vouts for a txid
 get_unspent_vouts() {
     local txid=$1
@@ -46,12 +55,6 @@ check_utxo_spent() {
     fi
 }
 
-# Initialize counters
-tx_count=0
-processed_count=0
-skipped_count=0
-current_block=$(get_block_height)
-last_processed_block=$current_block
 
 echo "Starting from block height: $current_block"
 echo "Will process $BATCH_SIZE transactions per block"
@@ -69,7 +72,7 @@ if [ $DRY_RUN -eq 0 ]; then
     > "$SKIPPED_FILE"
 fi
 
-# Process transactions
+
 while IFS=$'\t' read -r txid raw_tx; do
     tx_count=$((tx_count + 1))
     
@@ -90,9 +93,8 @@ while IFS=$'\t' read -r txid raw_tx; do
         echo "----------------------------------------"
         continue
     fi
-    
     # Process each vout
-    echo "$vouts" | while read -r vout; do
+    while read -r vout; do
         echo "Checking vout: $vout"
         
         # Check if this specific vout is spent
@@ -104,6 +106,7 @@ while IFS=$'\t' read -r txid raw_tx; do
         fi
         
         # Wait for new block if we've hit batch size
+        echo "DEBUG: processed_count at checking: $processed_count"
         if [ $((processed_count % BATCH_SIZE)) -eq 0 ] && [ $processed_count -ne 0 ]; then
             echo "Waiting for next block..."
             while true; do
@@ -131,7 +134,8 @@ while IFS=$'\t' read -r txid raw_tx; do
             echo -e "$txid\t$vout\t$result" >> "$SENT_FILE"
             processed_count=$((processed_count + 1))
         fi
-    done
+    done <<< "$vouts"
+    echo "Processed count after done: $processed_count"
     
     echo "----------------------------------------"
     sleep 1
