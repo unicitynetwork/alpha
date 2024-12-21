@@ -19,12 +19,21 @@ sudo apt upgrade
 sudo apt install build-essential libtool autotools-dev automake pkg-config bsdmainutils curl git cmake bison
 ```
 
-make sure that you are using g++ version > 10
+make sure that you are using g++ version > 10.
 You can check with 
 
 ```bash
 g++ --version
 ```
+If g++ version is less than 10 then update as follows (Ubuntu)
+
+```
+sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-10 20
+sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-10 20
+sudo update-alternatives --config gcc
+sudo update-alternatives --config g++
+```
+
 download the latest version of the source code
 
 ```bash
@@ -87,7 +96,7 @@ The compiled executables will be found in `depends/x86_64-pc-linux-gnu/bin/` and
 ## Building for MacOS
 
 Install xcode and brew (see instructions here 
-[OSX build instructions](build-osx.md).
+[OSX build instructions](../doc/build-osx.md).
 
 `brew install git automake libtool pkg-config cmake bison`
 
