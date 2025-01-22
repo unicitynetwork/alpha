@@ -30,7 +30,7 @@ The top layer provides a Proof of Work trust anchor - anchoring the second layer
 
 This codebase implements the top layer and uses a fork of Bitcoin (Scash). It is not designed to be a transaction system and 99% of the codebase is redundant - transactions are executed at the Agent layer not in the Consensus Layer. Transactions are still needed (coinbase, mining pool shares) but they are discouraged - consensus layer transactions are expensive and cumbersome - each utxo has to be transferred indivudally. Transactions at the agent layer are anonymous, frictionless and untraceable.
 
-See batch UTXO transaction instructions [here.] (https://github.com/unicitynetwork/alpha/blob/main/alpha/sending_transactions.md)
+See batch UTXO transaction instructions [here.](alpha/sending_transactions.md)
 
 The major changes from the Bitcoin codebase
 
