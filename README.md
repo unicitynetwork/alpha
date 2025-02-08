@@ -8,7 +8,7 @@ Build instructions [here](alpha/build-alpha.md).
 
 Latest whitepaper [here.](https://unicitynetwork.github.io/whitepaper/)
 Binaries [here.](https://github.com/unicitynetwork/alpha/releases) Block Explorer [here.](https://www.unicity.network) Mining Instructions [here.](https://github.com/unicitynetwork/alpha-miner)
-
+ 
 Community address: 
 
 ```
