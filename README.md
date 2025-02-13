@@ -1,39 +1,84 @@
 
 Alpha
 =====================================
+Unicity is a multi-layered developer platform for building, deploying and orchestrating off-chain crypto agents. Alpha is the trust anchor and native currency of Unicity, a platform for building decentralized applications using Verifiable Autonomous Agents. The Alpha coins replicate the self-verifiability property of physical cash, i.e. the coins are compact, authenticated data structures which can be passed through any medium peer-to-peer, chain-to-chain and verified without bridges or trusted third parties. 
+
 Alpha is released under the terms of the MIT license.
 
-Build instructions [here](alpha/build-alpha.md).
+## Quick Links
 
+- [Latest Whitepaper](https://unicitynetwork.github.io/whitepaper/)
+- [Binary Releases](https://github.com/unicitynetwork/alpha/releases)
+- [Block Explorer](https://www.unicity.network)
+- [Mining Instructions](https://github.com/unicitynetwork/alpha-miner)
+- [Build Instructions](alpha/build-alpha.md)
+- [Batch UTXO Transaction Guide](alpha/sending_transactions.md)
 
-Latest whitepaper [here.](https://unicitynetwork.github.io/whitepaper/)
-Binaries [here.](https://github.com/unicitynetwork/alpha/releases) Block Explorer [here.](https://www.unicity.network) Mining Instructions [here.](https://github.com/unicitynetwork/alpha-miner)
+## ALPHA Community Address
 
- 
-Community address: 
-
+If you would like to support the development, then you can add the community address to the list of mining addresses (see mining instructions here: https://github.com/unicitynetwork/alpha-miner). Current community address is:
 ```
 alpha1qmmqcy66tyjfq5rgngxk4p2r34y9ny7cnnfq3wmfw8fyx03yahxkq0ck3kh
 ```
 
+## Architecture
 
-Alpha is the trust anchor and native currency of Unicity, a platform for building decentralized applications using Verifiable Autonomous Agents. The Alpha coins replicate the self-verifiability property of physical cash, i.e. the coins are compact, authenticated data structures which can be passed through any medium peer-to-peer, chain-to-chain and verified without bridges or trusted third parties. 
+Unicity has a layered architecture:
 
+1. **Proof of Work Trust Anchor**
+   - Provides the foundation for security
+   - Issues new coins through mining
+   - Anchors the proof aggregation layer
 
-The Unicity design is a layered architecture 
-			
-						Proof of Work Trust Anchor
-						Proof Aggregation Layer
-						Agent Layer
+2. **Proof Aggregation Layer**
+   - Bridges between trust anchor and agent layer
+   - Handles proof verification and aggregation
 
+3. **Agent Layer**
+   - Executes transactions
+   - Provides anonymous, frictionless operations
+   - Enables untraceable transfers
 
 The top layer provides a Proof of Work trust anchor - anchoring the second layer and providing new coins through mining which can then be extracted and used off-chain in the Agent layer.
 
-This codebase implements the top layer and uses a fork of Bitcoin (Scash). It is not designed to be a transaction system and 99% of the codebase is redundant - transactions are executed at the Agent layer not in the Consensus Layer. Transactions are still needed (coinbase, mining pool shares) but they are discouraged - consensus layer transactions are expensive and cumbersome - each utxo has to be transferred indivudally. Transactions at the agent layer are anonymous, frictionless and untraceable.
+This codebase implements the top layer and uses a fork of Bitcoin (Scash). It is not designed to be a transaction system and 99% of the codebase is redundant - transactions are executed at the Agent layer not in the Consensus Layer. Transactions are still needed (coinbase, mining pool shares) but they are discouraged - consensus layer transactions are expensive and cumbersome - each utxo has to be transferred individually. Transactions at the agent layer are anonymous, frictionless and untraceable.
 
 See batch UTXO transaction instructions [here.](alpha/sending_transactions.md)
 
-The major changes from the Bitcoin codebase
+## Summary of Key Features
+
+### Single Input Transactions
+To ensure local verifiability, each transaction must have exactly one input. This enables coin sub-ledgers to be extracted and used off-chain in the agent layer.
+
+```cpp
+if (tx.vin.size() != 1)
+    return state.Invalid(TxValidationResult::TX_CONSENSUS, "bad-txns-too-many-inputs", 
+    "Alpha Transactions must have exactly one input");
+```
+
+### Mining Specifications
+- **Hash Function**: RandomX (ASIC-resistant, as used in Monero)
+- **Block Time**: 2 minutes
+- **Block Reward**: 10 ALPHA
+- **Halving Period**: Equivalent to Bitcoin's timeframe (210,000 * 5 blocks)
+- **Difficulty Adjustment**: ASERT (Absolutely Scheduled Exponentially Rising Targets)
+  - Half-life: 12 hours
+  - Automatically adjusts to target 2-minute block times
+
+### Genesis Block Details
+- **Script**: "Financial Times 25/May/2024 What went wrong with capitalism"
+- **Timestamp**: Sun Jun 16 07:54:52 UTC 2024
+- **nBits**: 0x1d0fffff
+
+### Hard Fork Schedule
+The network undergoes programmatic hard forks every 50,000 blocks until on-chain governance is implemented.
+
+## Important Milestones
+- **Block 70228**: Switched from SHA256D to RandomX
+- **Block 70232**: ASERT difficulty adjustment implementation
+
+
+## The major changes from the Bitcoin codebase
 
 **Single input transactions only**
 
@@ -41,7 +86,6 @@ The major changes from the Bitcoin codebase
             return state.Invalid(TxValidationResult::TX_CONSENSUS, "bad-txns-too-many-inputs", "Alpha Transactions must have exactly one input");
 
 This ensures local verifability i.e. each coin sub-ledger can be extracted from the ledger and used off-chain in the agent layer.
-
 
 
 **RandomX Hash Function**
@@ -54,7 +98,7 @@ Difficulty was automatically reduced by a factor of 100,000 on this block to acc
 
 **10 ALPHA subsidy and 2 minute block time**
 
-The subsidy is 10 ALPHA with a target block time of 2 minutes. Halving period measured in time is the same as Bitcoin or 210000*5 blocks
+The subsidy is 10 ALPHA with a target block time of 2 minutes. Halving period measured in time is the same as Bitcoin or 210000*5 blocks.
 
 **ASERT**
 
@@ -73,8 +117,6 @@ nBits: 0x1d0fffff
 **PROGRAMMATIC HARD FORKS**
 
 Until on-chain governance is implemented the chain will be upgraded with a hard fork every 50,000 blocks
-
-
 
 
 Bitcoin Core integration/staging tree
