@@ -13,6 +13,21 @@ The Docker implementation provides:
 
 ## Quick Start
 
+### Option 1: Using pre-built image from GitHub Container Registry
+
+```bash
+# Pull the image (replace {owner} with the GitHub username or organization)
+docker pull ghcr.io/{owner}/alpha:latest
+
+# Run the container
+docker run -d --name alpha-node \
+  -p 8589:8589 -p 7933:7933 \
+  -v alpha-data:/root/.alpha \
+  ghcr.io/{owner}/alpha:latest
+```
+
+### Option 2: Building locally
+
 To build and run the Alpha node container:
 
 ```bash
@@ -24,6 +39,13 @@ docker compose -f docker/docker-compose.yml up -d
 
 # Check the logs
 docker compose -f docker/docker-compose.yml logs -f
+```
+
+### Option 3: Using the deployment script
+
+```bash
+# Run the deployment script
+./docker/deploy.sh
 ```
 
 ## Directory Structure
@@ -199,3 +221,28 @@ txindex=1
   - Use a non-root user in the container
   - Implement proper firewall rules
   - Set strong RPC credentials
+
+## Automated Builds
+
+This project uses GitHub Actions to automatically build and publish Docker images to GitHub Container Registry (ghcr.io) when new releases are created.
+
+### How to Use Published Images
+
+Once a release is created, the Docker image will be available at:
+
+```
+ghcr.io/{owner}/alpha:latest
+ghcr.io/{owner}/alpha:{tag}
+```
+
+Where `{owner}` is the GitHub username or organization name, and `{tag}` is the release version.
+
+### Manual Image Publishing
+
+You can manually build and publish the Docker image using:
+
+```bash
+./docker/publish-image.sh [tag]
+```
+
+For more information about the CI/CD process, see the `.github/workflows/README.md` file.
