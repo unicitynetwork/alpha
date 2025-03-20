@@ -1,0 +1,21 @@
+# Default configuration file with daemon mode enabled and exposed RPC port 8589 with default user:password
+rpcuser=user
+rpcpassword=password
+chain=alpha
+daemon=0
+debug=0
+txindex=1
+
+[alpha]
+adddnsseed=
+
+[alphatestnet]
+adddnsseed=
+
+randomxfastmode=1
+
+server=1
+rpcbind=0.0.0.0
+rpcbind=::/0
+rpcport=8589
+txindex=1

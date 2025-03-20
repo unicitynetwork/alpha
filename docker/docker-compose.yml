@@ -1,0 +1,18 @@
+services:
+  alpha:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: alpha-node
+    volumes:
+      - alpha-data:/root/.alpha
+      # Mount custom configuration if available
+      - ./config:/config:ro
+    ports:
+      - "8589:8589"  # RPC port
+      - "7933:7933"  # P2P port
+    restart: unless-stopped
+
+volumes:
+  alpha-data:
+    # This volume persists blockchain data between container restarts
