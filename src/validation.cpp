@@ -3185,8 +3185,8 @@ bool Chainstate::ActivateBestChainStep(BlockValidationState& state, CBlockIndex*
     int nHeight = pindexFork ? pindexFork->nHeight : -1;
     
     //Shut down to force recompilation
-      if (nHeight == 250000)
-          return FatalError(m_chainman.GetNotifications(), state, "Forced shutdown at block 250,000. Get latest version");
+      if (nHeight == 300000)
+          return FatalError(m_chainman.GetNotifications(), state, "Forced shutdown at block 300,000. Get latest version");
 
     while (fContinue && nHeight != pindexMostWork->nHeight) {
         // Don't iterate the entire list of potential improvements toward the best tip, as we likely only need
