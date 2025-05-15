@@ -1,0 +1,34 @@
+# Example custom Alpha configuration file
+# Rename to alpha.conf to activate these settings
+
+# Network-related settings
+listen=1
+bind=0.0.0.0
+port=7933
+
+# RPC settings (for API access)
+rpcbind=0.0.0.0
+rpcallowip=0.0.0.0/0
+rpcuser=alpha_user
+rpcpassword=change_this_to_a_secure_password
+rpcport=8589
+
+# Reduce disk usage
+#prune=550
+#txindex=0
+
+# Performance tuning
+dbcache=1000
+maxmempool=300
+
+# Debug options
+#debug=net
+logtimestamps=1
+logips=1
+
+# Logging
+printtoconsole=1
+
+# ZMQ notifications
+#zmqpubhashtx=tcp://0.0.0.0:7934
+#zmqpubhashblock=tcp://0.0.0.0:7934

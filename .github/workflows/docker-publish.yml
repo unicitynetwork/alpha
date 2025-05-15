@@ -1,0 +1,71 @@
+name: Build and Publish Docker Image
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build (leave empty for latest)'
+        required: false
+        default: ''
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set tag variables
+        id: vars
+        run: |
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            VERSION=${{ github.event.release.tag_name }}
+          elif [[ -n "${{ github.event.inputs.tag }}" ]]; then
+            VERSION=${{ github.event.inputs.tag }}
+          else
+            VERSION=latest
+          fi
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "IMAGE_NAME=ghcr.io/${REPO_LOWER}/alpha" >> $GITHUB_ENV
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./docker/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ env.VERSION }}
+            ${{ env.IMAGE_NAME }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Update Docker Hub description
+        uses: peter-evans/dockerhub-description@v3
+        if: github.event_name == 'release'
+        with:
+          registry: ghcr.io
+          repository: ${{ github.repository_owner }}/alpha
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          short-description: "Alpha cryptocurrency node"
+          readme-filepath: ./docker/README.md
