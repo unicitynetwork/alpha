@@ -12,6 +12,7 @@
 - All functional tests: `test/functional/test_runner.py`
 - Single functional test: `test/functional/feature_rbf.py`
 - Test coverage: `./configure --enable-lcov && make && make cov`
+- Debug modes: Use `signet`, `testnet`, or `regtest` for testing environments
 
 ## Lint Commands
 - Run all lint checks: `ci/lint_run_all.sh`
@@ -29,3 +30,4 @@
 - Error handling: Use `assert`/`Assert` for assumptions, `CHECK_NONFATAL` for recoverable errors
 - Use init lists for member initialization: `int x{0};` instead of `int x = 0;`
 - Always use full namespace specifiers for function calls
+- Keep commits atomic: Don't mix code changes with formatting or moves

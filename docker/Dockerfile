@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y \
     libssl-dev libevent-dev libboost-system-dev libboost-filesystem-dev \
     libboost-chrono-dev libboost-test-dev libboost-thread-dev \
     libminiupnpc-dev libzmq3-dev libdb-dev libdb++-dev git \
-    cmake bison \
+    cmake bison curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
