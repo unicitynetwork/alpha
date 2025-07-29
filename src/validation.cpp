@@ -3988,7 +3988,7 @@ static bool ContextualCheckBlockHeader(const CBlockHeader& block, BlockValidatio
             bool fRandomX_block = (block.nVersion & g_Rx_versionbit) != 0;
 
             // Reject ANY block without RandomX bit after enforcement height
-            if (block.nVersion == 1 || !fRandomX_block) {
+            if (!fRandomX_block) {
                 return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-blk-randomx-required",
                     strprintf("block at height %d requires RandomX (version=%d, RandomX bit=%s)",
                               nHeight, block.nVersion, fRandomX_block ? "set" : "not set"));
