@@ -1,21 +1,34 @@
-# Default configuration file with daemon mode enabled and exposed RPC port 8589 with default user:password
-rpcuser=user
-rpcpassword=password
+# Default configuration file with RPC properly exposed to external connections
 chain=alpha
 daemon=0
 debug=0
 txindex=1
+
+# Network-related settings
+listen=1
+bind=0.0.0.0
+port=7933
+
+# RPC settings (for API access)
+server=1
+rpcbind=0.0.0.0
+rpcallowip=0.0.0.0/0
+rpcuser=user
+rpcpassword=password
+rpcport=8589
+
+# Performance tuning
+randomxfastmode=1
+dbcache=1000
+maxmempool=300
+
+# Logging settings
+printtoconsole=1
+logtimestamps=1
+logips=1
 
 [alpha]
 adddnsseed=
 
 [alphatestnet]
 adddnsseed=
-
-randomxfastmode=1
-
-server=1
-rpcbind=0.0.0.0
-rpcbind=::/0
-rpcport=8589
-txindex=1

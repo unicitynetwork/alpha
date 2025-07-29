@@ -154,8 +154,8 @@ public:
         //height at which RandomX hashing starts
         consensus.RandomXHeight = 70228;
 
-        //Enforce RandomX only after July 30, 2025 00:00 UTC
-        const int RandomXEnforcementHeight = 302540; 
+        //Enforce RandomX only after August 03, 2025 04:00 UTC
+        const int RandomXEnforcementHeight = 305535; 
         consensus.RandomXEnforcementHeight = RandomXEnforcementHeight;
         
         //Multipler when SHA256D switches to RandomX;
