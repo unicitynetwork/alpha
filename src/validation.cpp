@@ -2818,19 +2818,20 @@ void Chainstate::UpdateTip(const CBlockIndex* pindexNew)
         for (int bit = 0; bit < VERSIONBITS_NUM_BITS; bit++) {
             // !ALPHA 
             // Ignore the warning related to the RandomX bit
-            if ((g_isAlpha && bit == g_Rx_versionbit) == false){
-                WarningBitsConditionChecker checker(m_chainman, bit);
-                ThresholdState state = checker.GetStateFor(pindex, params.GetConsensus(), m_chainman.m_warningcache.at(bit));
-                if (state == ThresholdState::ACTIVE || state == ThresholdState::LOCKED_IN) {
-                    const bilingual_str warning = strprintf(_("Unknown new rules activated (versionbit %i)"), bit);
-                    if (state == ThresholdState::ACTIVE) {
-                        m_chainman.GetNotifications().warning(warning);
-                    } else {
-                        AppendWarning(warning_messages, warning);
-                    }
-                }
+            if (g_isAlpha && (1 << bit == g_Rx_versionbit)) {
+                continue;
             }
             // !ALPHA END
+            WarningBitsConditionChecker checker(m_chainman, bit);
+            ThresholdState state = checker.GetStateFor(pindex, params.GetConsensus(), m_chainman.m_warningcache.at(bit));
+            if (state == ThresholdState::ACTIVE || state == ThresholdState::LOCKED_IN) {
+                const bilingual_str warning = strprintf(_("Unknown new rules activated (versionbit %i)"), bit);
+                if (state == ThresholdState::ACTIVE) {
+                    m_chainman.GetNotifications().warning(warning);
+                } else {
+                    AppendWarning(warning_messages, warning);
+                }
+            }
         }
     }
     UpdateTipLog(coins_tip, pindexNew, params, __func__, "", warning_messages.original);
@@ -3984,12 +3985,12 @@ static bool ContextualCheckBlockHeader(const CBlockHeader& block, BlockValidatio
         // Check if we're past RandomX enforcement height
         if (nHeight >= consensusParams.RandomXEnforcementHeight) {
             // Verify the RandomX bit is set
-            bool fRandomX_block = (block.nVersion & (1 << g_Rx_versionbit)) != 0;
+            bool fRandomX_block = (block.nVersion & g_Rx_versionbit) != 0;
 
             // Reject ANY block without RandomX bit after enforcement height
-            if (block.nVersion == 1 || !fRandomX_block) {
+            if (!fRandomX_block) {
                 return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-blk-randomx-required",
-                    strprintf("block at height %d requires RandomX (version=%d, RandomX bit=%s)",
+                    strprintf("block at height %d requires RandomX (version=0x%x, RandomX bit=%s)",
                               nHeight, block.nVersion, fRandomX_block ? "set" : "not set"));
             }
         }

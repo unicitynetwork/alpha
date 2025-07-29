@@ -25,7 +25,7 @@ extern bool g_isAlpha;
 //if it is a RandomX block or not. Since Versionbits was introduced
 //we can't simply incrememnt the vesion number and need to use a bit
 //of versionbits.
-const int  g_Rx_versionbit = 1;
+const int  g_Rx_versionbit = 0x02;
 // !ALPHA END
 
 /** Nodes collect new transactions into a block, hash them into a hash tree,
@@ -62,7 +62,7 @@ public:
         // !ALPHA
         if (g_isAlpha)
         {
-            if ((obj.nVersion & (1 << g_Rx_versionbit)) != 0)
+            if ((obj.nVersion & g_Rx_versionbit) != 0)
                 READWRITE(obj.hashRandomX);
         }
         else if (g_isRandomX)

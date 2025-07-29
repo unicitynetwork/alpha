@@ -130,36 +130,12 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
     pblock->nVersion = m_chainstate.m_chainman.m_versionbitscache.ComputeBlockVersion(pindexPrev, chainparams.GetConsensus());
 
 // !ALPHA
-/*    int RandomXHeight = chainparams.GetConsensus().RandomXHeight;
-
-    if (g_isAlpha && nHeight >= RandomXHeight)
-    {
-        pblock->nVersion |= (1 << g_Rx_versionbit);
-    }*/
- 
     int RandomXHeight = chainparams.GetConsensus().RandomXHeight;
-    int RandomXEnforcementHeight = chainparams.GetConsensus().RandomXEnforcementHeight;
-
-    if (g_isAlpha && nHeight >= RandomXHeight)
-    {
-	pblock->nVersion |= (1 << g_Rx_versionbit);
-    }
-
-    // After enforcement height, ensure RandomX bit is set
-    if (g_isAlpha && nHeight >= RandomXEnforcementHeight) {
-	bool fRandomX_block = (pblock->nVersion & (1 << g_Rx_versionbit)) != 0;
-
-	if (!fRandomX_block || pblock->nVersion == 1) {
-    	    throw std::runtime_error(strprintf(
-        	"CreateNewBlock: Cannot mine non-RandomX block at height %d (RandomX enforcement active since height %d). "
-        	"Block version=0x%08x, RandomX bit=%s",
-        	nHeight, RandomXEnforcementHeight, pblock->nVersion, fRandomX_block ? "set" : "not set"));
-	}
-
-	LogPrintf("Mining at height %d: RandomX enforced (version=0x%08x)\n", nHeight, pblock->nVersion);
+    if (g_isAlpha && nHeight >= RandomXHeight) {
+        pblock->nVersion |= g_Rx_versionbit;
     }
 // !ALPHA END
-    
+
     // -regtest only: allow overriding block.nVersion with
     // -blockversion=N to test forking scenarios
     if (chainparams.MineBlocksOnDemand()) {

@@ -281,27 +281,23 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
     
     // !ALPHA
     //When the blockheight is RandomXHeight (70,228) we reduce the difficulty by RandomX_DiffMult (100,000)
-        
-    if (g_isAlpha &&  (pindexLast->nHeight + 1 == params.RandomXHeight))
-    {
+    if (g_isAlpha && (pindexLast->nHeight + 1 == params.RandomXHeight)) {
         arith_uint256 bnPrevDiff;
         bnPrevDiff.SetCompact(pindexLast->nBits);
 
         const arith_uint256 bnPowLimit = UintToArith256(params.powLimit);
-        
+
         arith_uint256 bnNewDiff = bnPrevDiff*params.RandomX_DiffMult;
-        
-        if (bnNewDiff > bnPowLimit)
+
+        if (bnNewDiff > bnPowLimit) {
             bnNewDiff = bnPowLimit;
-        
+        }
+
         uint32_t nBitsNew = bnNewDiff.GetCompact();
         
         return nBitsNew;
     }
-    
     // !ALPHA END
-
-
 
     // !SCASH
     // Use ASERT DAA if activated, otherwise use legacy Bitcoin DAA
@@ -473,7 +469,6 @@ bool CheckProofOfWork(uint256 hash, unsigned int nBits, const Consensus::Params&
 // Seed string contains an epoch integer and is sha256d hashed to derive the seed hash (RandomX key).
 static const char *RANDOMX_EPOCH_SEED_STRING = "Scash/RandomX/Epoch/%d";
 static const char *RANDOMX_EPOCH_SEED_STRING_ALPHA = "Alpha/RandomX/Epoch/%d";
-
 // !ALPHA END
 
 // Epoch is Unix time stamp in seconds divided by epoch duration in seconds.
@@ -646,16 +641,12 @@ bool CheckProofOfWorkRandomX(const CBlockHeader& block, const Consensus::Params&
     
     // !ALPHA
     // Check if the block randomx bit is set
-    
-    if (g_isAlpha)
-    {
-        bool fRandomX_block = (block.nVersion & (1 << g_Rx_versionbit)) != 0;
-        
-        //if nVersion is 1 then the original chain using sha256d
-        if (block.nVersion == 1 || !fRandomX_block)
+    if (g_isAlpha) {
+        bool fRandomX_block = (block.nVersion & g_Rx_versionbit) != 0;
+        if (!fRandomX_block)
             return CheckProofOfWork(block.GetHash(), block.nBits, params);
-        // !ALPHA END
     }
+    // !ALPHA END
     
     unsigned int nBits = block.nBits;
 

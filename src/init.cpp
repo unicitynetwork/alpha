@@ -464,7 +464,6 @@ void SetupServerArgs(ArgsManager& argsman)
     const auto signetChainParams = CreateChainParams(argsman, ChainType::SIGNET);
     const auto regtestChainParams = CreateChainParams(argsman, ChainType::REGTEST);
 
-
     // !SCASH
     const auto scashRegtestBaseParams = CreateBaseChainParams(ChainType::SCASHREGTEST);
     const auto scashTestnetBaseParams = CreateBaseChainParams(ChainType::SCASHTESTNET);
@@ -474,7 +473,6 @@ void SetupServerArgs(ArgsManager& argsman)
     const auto scashMainChainParams = CreateChainParams(argsman, ChainType::SCASHMAIN);
     // !SCASH END
 
-    
     // !ALPHA
     const auto alphaRegtestBaseParams = CreateBaseChainParams(ChainType::ALPHAREGTEST);
     const auto alphaTestnetBaseParams = CreateBaseChainParams(ChainType::ALPHATESTNET);
@@ -1214,7 +1212,7 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
         LogPrintf("%s: Alpha active\n", __func__);
     }
     // !ALPHA END 
-        
+
     assert(!(g_isAlpha && !g_isRandomX) && "g_isAlpha cannot be true if g_isRandomX is false");
 
 
