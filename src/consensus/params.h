@@ -173,6 +173,9 @@ struct Params {
     //height at which RandomX starts
     int RandomXHeight;
 
+    // height at which RandomX enforcement starts 
+    int RandomXEnforcementHeight;
+
     //nBits multiplier when RandomX is triggered
     uint32_t RandomX_DiffMult;
     // !ALPHA END
