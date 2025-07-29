@@ -437,20 +437,14 @@ public:
         READWRITE(obj.nBits);
         READWRITE(obj.nNonce);
 
-                
         // !ALPHA
         assert(!(g_isAlpha && !g_isRandomX) && "g_isAlpha cannot be true if g_isRandomX is false");
-        if (g_isRandomX)
-        {
-            if (g_isAlpha)
-            {
-                if ((obj.nVersion & g_Rx_versionbit) != 0){
+        if (g_isRandomX) {
+            if (g_isAlpha) {
+                if ((obj.nVersion & g_Rx_versionbit) != 0) {
                     READWRITE(obj.hashRandomX);
                 }
-                
-            }
-            else
-            {
+            } else {
                 READWRITE(obj.hashRandomX);
             }
         }

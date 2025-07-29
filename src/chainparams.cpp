@@ -153,8 +153,7 @@ std::unique_ptr<const CChainParams> CreateChainParams(const ArgsManager& args, c
         return CChainParams::AlphaMain();
     }
     // !ALPHA END
-            
-            
+
     }
     assert(false);
 }

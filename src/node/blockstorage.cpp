@@ -134,15 +134,14 @@ bool BlockTreeDB::LoadBlockIndexGuts(const Consensus::Params& consensusParams, s
                 
                 // !ALPHA
                 assert(!(g_isAlpha && !g_isRandomX) && "g_isAlpha cannot be true if g_isRandomX is false");
-                if (g_isRandomX)
-                {
-                    if (g_isAlpha)
-                    {
-                        if ((pindexNew->nVersion & g_Rx_versionbit) != 0)
-                            pindexNew->hashRandomX    = diskindex.hashRandomX;
+                if (g_isRandomX) {
+                    if (g_isAlpha) {
+                        if ((pindexNew->nVersion & g_Rx_versionbit) != 0) {
+                            pindexNew->hashRandomX = diskindex.hashRandomX;
+                        }
+                    } else {
+                        pindexNew->hashRandomX = diskindex.hashRandomX;
                     }
-                    else
-                        pindexNew->hashRandomX    = diskindex.hashRandomX;
                     
                     if (!CheckProofOfWorkRandomX(pindexNew->GetBlockHeader(), consensusParams, POW_VERIFY_COMMITMENT_ONLY)) {
                         return error("%s: CheckProofOfWork failed: %s", __func__, pindexNew->ToString());

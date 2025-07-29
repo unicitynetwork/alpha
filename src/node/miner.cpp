@@ -131,13 +131,11 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
 
 // !ALPHA
     int RandomXHeight = chainparams.GetConsensus().RandomXHeight;
-
-    if (g_isAlpha && nHeight >= RandomXHeight)
-    {
+    if (g_isAlpha && nHeight >= RandomXHeight) {
         pblock->nVersion |= g_Rx_versionbit;
     }
 // !ALPHA END
-    
+
     // -regtest only: allow overriding block.nVersion with
     // -blockversion=N to test forking scenarios
     if (chainparams.MineBlocksOnDemand()) {

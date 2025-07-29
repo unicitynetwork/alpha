@@ -90,24 +90,19 @@ double GetDifficulty(const CBlockIndex& blockindex)
     
     double dDiff;
     
-    if (g_isAlpha)
-    {
+    if (g_isAlpha) {
         dDiff = (double)0x000fffff / (double)(blockindex.nBits & 0x00ffffff);
-    }
-    else
-    {
+    } else {
         dDiff = (double)0x0000ffff / (double)(blockindex.nBits & 0x00ffffff);
     }
 
 // !ALPHA END
     
-    while (nShift < 29)
-    {
+    while (nShift < 29) {
         dDiff *= 256.0;
         nShift++;
     }
-    while (nShift > 29)
-    {
+    while (nShift > 29) {
         dDiff /= 256.0;
         nShift--;
     }
@@ -181,23 +176,17 @@ UniValue blockheaderToJSON(const CBlockIndex& tip, const CBlockIndex& blockindex
         result.pushKV("nextblockhash", pnext->GetBlockHash().GetHex());
 
     // !ALPHA
-    
-    if (g_isAlpha)
-    {
+    if (g_isAlpha) {
         if ((blockindex.nVersion & g_Rx_versionbit) != 0) {
             result.pushKV("rx_epoch", GetEpoch(blockindex.nTime, Params().GetConsensus().nRandomXEpochDuration));
             result.pushKV("rx_hash", blockindex.hashRandomX.GetHex());
             result.pushKV("rx_cm", GetRandomXCommitment(blockindex.GetBlockHeader()).GetHex());
         }
-    }
-    else if (g_isRandomX)
-    {
+    } else if (g_isRandomX) {
         result.pushKV("rx_epoch", GetEpoch(blockindex.nTime, Params().GetConsensus().nRandomXEpochDuration));
         result.pushKV("rx_hash", blockindex.hashRandomX.GetHex());
         result.pushKV("rx_cm", GetRandomXCommitment(blockindex.GetBlockHeader()).GetHex());
     }
-    
-
     // !ALPHA END
 
     return result;

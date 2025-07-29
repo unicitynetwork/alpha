@@ -18,23 +18,20 @@ void SetupChainParamsBaseOptions(ArgsManager& argsman)
     
 /*
 // !SCASH
-//    argsman.AddArg("-chain=<chain>", "Use the chain <chain> (default: main). Allowed values: scash, scashtestnet, scashregtest, main, test, signet, regtest", ArgsManager::ALLOW_ANY, OptionsCategory::CHAINPARAMS);
+    argsman.AddArg("-chain=<chain>", "Use the chain <chain> (default: main). Allowed values: scash, scashtestnet, scashregtest, main, test, signet, regtest", ArgsManager::ALLOW_ANY, OptionsCategory::CHAINPARAMS);
     argsman.AddArg("-scashregtest", "Enter scash regression test mode. Equivalent to -chain=scashregtest.", ArgsManager::ALLOW_ANY, OptionsCategory::CHAINPARAMS);
     argsman.AddArg("-scashtestnet", "Use the scash test chain. Equivalent to -chain=scashtestnet.", ArgsManager::ALLOW_ANY, OptionsCategory::CHAINPARAMS);
     argsman.AddArg("-scash", "Use the scash chain. Equivalent to -chain=scash.", ArgsManager::ALLOW_ANY, OptionsCategory::CHAINPARAMS);
 // !SCASH END
 */
-    
+
 // !ALPHA
     argsman.AddArg("-chain=<chain>", "Use the chain <chain> (default: main). Allowed values:  alpha, alphatest, alpharegtest, main, test, signet", ArgsManager::ALLOW_ANY, OptionsCategory::CHAINPARAMS);
     argsman.AddArg("-alpharegtest", "Enter alpha regression test mode. Equivalent to -chain=alpharegtest.", ArgsManager::ALLOW_ANY, OptionsCategory::CHAINPARAMS);
     argsman.AddArg("-alphatestnet", "Use the alpha test chain. Equivalent to -chain=alphatestnet.", ArgsManager::ALLOW_ANY, OptionsCategory::CHAINPARAMS);
     argsman.AddArg("-alpha", "Use the Alpha chain. Equivalent to -chain=alpha.", ArgsManager::ALLOW_ANY, OptionsCategory::CHAINPARAMS);
 // !ALPHA END
-    
-    
-    
-    
+
     argsman.AddArg("-regtest", "Enter regression test mode, which uses a special chain in which blocks can be solved instantly. "
                  "This is intended for regression testing tools and app development. Equivalent to -chain=regtest.", ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::CHAINPARAMS);
     argsman.AddArg("-testactivationheight=name@height.", "Set the activation height of 'name' (segwit, bip34, dersig, cltv, csv). (regtest-only)", ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::DEBUG_TEST);
@@ -60,7 +57,6 @@ const CBaseChainParams& BaseParams()
 std::unique_ptr<CBaseChainParams> CreateBaseChainParams(const ChainType chain)
 {
     switch (chain) {
-    // !SCASH
     case ChainType::MAIN:
         return std::make_unique<CBaseChainParams>("btc", 8332, 8334);
     case ChainType::TESTNET:
@@ -69,8 +65,8 @@ std::unique_ptr<CBaseChainParams> CreateBaseChainParams(const ChainType chain)
         return std::make_unique<CBaseChainParams>("btcsignet", 38332, 38334);
     case ChainType::REGTEST:
         return std::make_unique<CBaseChainParams>("btcregtest", 18443, 18445);
-            
 
+    // !SCASH
     case ChainType::SCASHMAIN:
         return std::make_unique<CBaseChainParams>("scash", 8342, 8344);
     case ChainType::SCASHTESTNET:
@@ -79,7 +75,6 @@ std::unique_ptr<CBaseChainParams> CreateBaseChainParams(const ChainType chain)
         return std::make_unique<CBaseChainParams>("scashregtest", 18453, 18455);
     // !SCASH END
 
-
     // !ALPHA
     case ChainType::ALPHAMAIN:
         return std::make_unique<CBaseChainParams>("alpha", 8589, 8591);
@@ -87,9 +82,9 @@ std::unique_ptr<CBaseChainParams> CreateBaseChainParams(const ChainType chain)
         return std::make_unique<CBaseChainParams>("alphatestnet", 18589, 18591);
     case ChainType::ALPHAREGTEST:
         return std::make_unique<CBaseChainParams>("alpharegtest", 28589, 28591);
-            
-    }
     // !ALPHA END
+
+    }
     assert(false);
 }
 

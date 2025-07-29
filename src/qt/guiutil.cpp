@@ -151,8 +151,9 @@ bool parseBitcoinURI(const QUrl &uri, SendCoinsRecipient *out)
 {
     // return if URI is not valid or is no bitcoin: URI
     // !ALPHA
-    if(!uri.isValid() || uri.scheme() != QString("alpha"))
+    if (!uri.isValid() || uri.scheme() != QString("alpha")) {
         return false;
+    }
     // !ALPHA END
 
     SendCoinsRecipient rv;
