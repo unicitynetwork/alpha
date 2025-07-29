@@ -156,7 +156,6 @@ public:
 
         //Enforce RandomX only after July 30, 2025 00:00 UTC
         const int RandomXEnforcementHeight = 302540; 
-        //	const int RandomXEnforcementHeight = 200000;
         consensus.RandomXEnforcementHeight = RandomXEnforcementHeight;
         
         //Multipler when SHA256D switches to RandomX;
