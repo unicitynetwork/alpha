@@ -173,6 +173,9 @@ struct Params {
     //height at which RandomX starts
     int RandomXHeight;
 
+    // PATCH: Disable SHA256 blocks
+    int RandomXEnforcementHeight;
+
     //nBits multiplier when RandomX is triggered
     uint32_t RandomX_DiffMult;
     // !ALPHA END
