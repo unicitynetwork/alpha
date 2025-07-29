@@ -444,7 +444,7 @@ public:
         {
             if (g_isAlpha)
             {
-                if ((obj.nVersion & (1 << g_Rx_versionbit)) != 0){
+                if ((obj.nVersion & g_Rx_versionbit) != 0){
                     READWRITE(obj.hashRandomX);
                 }
                 

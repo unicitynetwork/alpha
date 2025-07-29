@@ -134,7 +134,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
 
     if (g_isAlpha && nHeight >= RandomXHeight)
     {
-        pblock->nVersion |= (1 << g_Rx_versionbit);
+        pblock->nVersion |= g_Rx_versionbit;
     }
 // !ALPHA END
     

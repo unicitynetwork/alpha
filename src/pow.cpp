@@ -649,7 +649,7 @@ bool CheckProofOfWorkRandomX(const CBlockHeader& block, const Consensus::Params&
     
     if (g_isAlpha)
     {
-        bool fRandomX_block = (block.nVersion & (1 << g_Rx_versionbit)) != 0;
+        bool fRandomX_block = (block.nVersion & g_Rx_versionbit) != 0;
         
         //if nVersion is 1 then the original chain using sha256d
         if (block.nVersion == 1 || !fRandomX_block)

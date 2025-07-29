@@ -138,7 +138,7 @@ bool BlockTreeDB::LoadBlockIndexGuts(const Consensus::Params& consensusParams, s
                 {
                     if (g_isAlpha)
                     {
-                        if ((pindexNew->nVersion & (1 << g_Rx_versionbit)) != 0)
+                        if ((pindexNew->nVersion & g_Rx_versionbit) != 0)
                             pindexNew->hashRandomX    = diskindex.hashRandomX;
                     }
                     else

@@ -184,7 +184,7 @@ UniValue blockheaderToJSON(const CBlockIndex& tip, const CBlockIndex& blockindex
     
     if (g_isAlpha)
     {
-        if ((blockindex.nVersion & (1 << g_Rx_versionbit)) != 0) {
+        if ((blockindex.nVersion & g_Rx_versionbit) != 0) {
             result.pushKV("rx_epoch", GetEpoch(blockindex.nTime, Params().GetConsensus().nRandomXEpochDuration));
             result.pushKV("rx_hash", blockindex.hashRandomX.GetHex());
             result.pushKV("rx_cm", GetRandomXCommitment(blockindex.GetBlockHeader()).GetHex());
