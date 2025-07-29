@@ -56,7 +56,7 @@ COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # Expose ports - P2P and RPC
-EXPOSE 7933 8589
+EXPOSE 8590 8589
 
 # This directory was already created above
 

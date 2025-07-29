@@ -9,8 +9,8 @@ services:
       # Mount custom configuration if available
       - ./config:/config:ro
     ports:
-      - "8589:8589"  # RPC port
-      - "7933:7933"  # P2P port
+      - "127.0.0.1:8589:8589"  # RPC port (localhost only)
+      - "8590:8590"  # P2P port (public)
     restart: unless-stopped
 
 volumes:
