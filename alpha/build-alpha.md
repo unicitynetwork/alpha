@@ -58,7 +58,7 @@ appendWindowsPath=false
 ```
 Exit WSL and then restart WSL.
 
-###Building Alpha
+### Building Alpha
 
 
 Alpha requires building with the depends system.
