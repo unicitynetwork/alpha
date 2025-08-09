@@ -60,7 +60,7 @@ tail -n +3 "$UTXO_FILE" | while read -r line; do
         FEE=$FEERATE
 
         # Calculate amount minus fee
-        SEND_AMOUNT=$(echo "$amount - $FEE" | bc)
+	SEND_AMOUNT=$(printf "%.8f" $(echo "$amount - $FEE" | bc))
         if (( $(echo "$SEND_AMOUNT <= 0" | bc -l) )); then
             echo "Error: Output amount for TXID $txid vout $vout is less than or equal to zero after fees."
             continue
