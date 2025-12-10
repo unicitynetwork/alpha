@@ -1726,7 +1726,10 @@ CAmount GetBlockSubsidy(int nHeight, const Consensus::Params& consensusParams)
 // !ALPHA END
 
     // Subsidy is cut in half every 210,000 blocks which will occur approximately every 4 years.
-    nSubsidy >>= halvings;
+    // updated to force a single halving at block 400,000
+    if (nHeight >= 400000)
+           nSubsidy >>= 1;
+ //   nSubsidy >>= halvings;
     return nSubsidy;
 }
 
@@ -3186,8 +3189,8 @@ bool Chainstate::ActivateBestChainStep(BlockValidationState& state, CBlockIndex*
     int nHeight = pindexFork ? pindexFork->nHeight : -1;
     
     //Shut down to force recompilation
-      if (nHeight == 400000)
-          return FatalError(m_chainman.GetNotifications(), state, "Forced shutdown at block 370,000. Get latest version");
+      if (nHeight == 450000)
+          return FatalError(m_chainman.GetNotifications(), state, "Forced shutdown at block 450,000. Get latest version");
 
     while (fContinue && nHeight != pindexMostWork->nHeight) {
         // Don't iterate the entire list of potential improvements toward the best tip, as we likely only need
