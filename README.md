@@ -14,13 +14,6 @@ Alpha is released under the terms of the MIT license.
 - [Build Instructions](alpha/build-alpha.md)
 - [Batch UTXO Transaction Guide](alpha/sending_transactions.md)
 
-## ALPHA Community Address
-
-If you would like to support the development, then you can add the community address to the list of mining addresses (see mining instructions here: https://github.com/unicitynetwork/alpha-miner). Current community address is:
-```
-alpha1qmmqcy66tyjfq5rgngxk4p2r34y9ny7cnnfq3wmfw8fyx03yahxkq0ck3kh
-```
-
 ## Architecture
 
 Unicity has a layered architecture:
