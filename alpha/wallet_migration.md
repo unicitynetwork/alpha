@@ -45,6 +45,3 @@ Run ```importkeys.sh``` This will import the WIF keys into the wallet.
 - Make sure to erase properly the intermediate files
 - Monitor progress in terminal output
 
-
-## Support Unicity Development
-- Consider transferring a percentage of your coins to the project community address to support development. Your contributions are appreciated.
