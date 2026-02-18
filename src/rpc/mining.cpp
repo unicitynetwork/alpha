@@ -982,6 +982,14 @@ static RPCHelpMan getblocktemplate()
         result.pushKV("signet_challenge", HexStr(consensusParams.signet_challenge));
     }
 
+    // !ALPHA SIGNET FORK
+    if (g_isAlpha && consensusParams.nSignetActivationHeight > 0 &&
+        (pindexPrev->nHeight + 1) >= consensusParams.nSignetActivationHeight) {
+        result.pushKV("alpha_signet_challenge", HexStr(consensusParams.signet_challenge_alpha));
+        result.pushKV("alpha_signet_active", true);
+    }
+    // !ALPHA SIGNET FORK END
+
     if (!pblocktemplate->vchCoinbaseCommitment.empty()) {
         result.pushKV("default_witness_commitment", HexStr(pblocktemplate->vchCoinbaseCommitment));
     }

@@ -7,6 +7,7 @@
 
 #include <kernel/chainparams.h>
 
+#include <arith_uint256.h>
 #include <chainparamsseeds.h>
 #include <consensus/amount.h>
 #include <consensus/merkle.h>
@@ -147,20 +148,44 @@ public:
         };
 
 
+        // !ALPHA SIGNET FORK
+        consensus.nSignetActivationHeight = 450000;
+
+        // 1-of-5 bare multisig challenge: OP_1 <pk1> <pk2> <pk3> <pk4> <pk5> OP_5 OP_CHECKMULTISIG
+        // Replace placeholder pubkeys with actual 33-byte compressed pubkeys before deployment
+        consensus.signet_challenge_alpha = ParseHex(
+            "51"                                                              // OP_1
+            "21" "PLACEHOLDER_PUBKEY_1_33_BYTES_HEX_66_CHARS_HERE_0000000001"  // push 33 bytes + pubkey 1
+            "21" "PLACEHOLDER_PUBKEY_2_33_BYTES_HEX_66_CHARS_HERE_0000000002"  // push 33 bytes + pubkey 2
+            "21" "PLACEHOLDER_PUBKEY_3_33_BYTES_HEX_66_CHARS_HERE_0000000003"  // push 33 bytes + pubkey 3
+            "21" "PLACEHOLDER_PUBKEY_4_33_BYTES_HEX_66_CHARS_HERE_0000000004"  // push 33 bytes + pubkey 4
+            "21" "PLACEHOLDER_PUBKEY_5_33_BYTES_HEX_66_CHARS_HERE_0000000005"  // push 33 bytes + pubkey 5
+            "55"                                                              // OP_5
+            "ae"                                                              // OP_CHECKMULTISIG
+        );
+
+        // Post-fork ASERT anchor: nBits = powLimit, nPrevBlockTime resolved at runtime from block 449999
+        consensus.asertAnchorPostFork = Consensus::Params::ASERTAnchor{
+            450000,                                     // anchor block height (the fork block)
+            UintToArith256(consensus.powLimit).GetCompact(),  // nBits = powLimit
+            0,                                          // nPrevBlockTime = 0 (sentinel; resolved at runtime)
+        };
+        // !ALPHA SIGNET FORK END
+
         consensus.fPowRandomX = true;
         consensus.fAlphaEnabled = true;
         consensus.nRandomXEpochDuration = 7 * 24 * 60 * 60;     // one week
-        
+
         //height at which RandomX hashing starts
         consensus.RandomXHeight = 70228;
 
         //Enforce RandomX only after July 31, 2025 00:00 UTC
-        const int RandomXEnforcementHeight = 303271; 
+        const int RandomXEnforcementHeight = 303271;
         consensus.RandomXEnforcementHeight = RandomXEnforcementHeight;
-        
+
         //Multipler when SHA256D switches to RandomX;
         consensus.RandomX_DiffMult = 100000;
-        
+
         genesis = CreateAlphaGenesisBlock(1718524492, 40358186, 0x1d0fffff, 1, 10 * COIN);
         
         consensus.hashGenesisBlock = genesis.GetHash();
@@ -261,6 +286,13 @@ public:
             1714191827,   // anchor block previous block timestamp
         };
 */
+
+        // !ALPHA SIGNET FORK
+        consensus.nSignetActivationHeight = 200;  // Low height for testing
+        consensus.signet_challenge_alpha = ParseHex("51");  // OP_TRUE (trivial challenge, no signature needed)
+        consensus.asertAnchorPostFork = std::nullopt;
+        // !ALPHA SIGNET FORK END
+
         pchMessageStart[0] = 0x0d;
         pchMessageStart[1] = 0x12;
         pchMessageStart[2] = 0x0a;
@@ -369,11 +401,17 @@ public:
         };
 */
 
+        // !ALPHA SIGNET FORK
+        consensus.nSignetActivationHeight = 200;  // Low height for testing
+        consensus.signet_challenge_alpha = ParseHex("51");  // OP_TRUE (trivial challenge, no signature needed)
+        consensus.asertAnchorPostFork = std::nullopt;
+        // !ALPHA SIGNET FORK END
+
         consensus.fPowRandomX = true;
         consensus.fAlphaEnabled = true;
         consensus.nRandomXEpochDuration = 24 * 60 * 60;     // one day
-        
-        
+
+
         //Difficulty is divided by this amount when RandomX blocks start
         consensus.RandomX_DiffMult = 100000;
 

@@ -16,6 +16,14 @@
  */
 bool CheckSignetBlockSolution(const CBlock& block, const Consensus::Params& consensusParams);
 
+// !ALPHA SIGNET FORK
+/**
+ * Height-gated variant: check signet block solution only if height >= activation height.
+ * Uses signet_challenge_alpha (not signet_challenge) from consensus params.
+ */
+bool CheckSignetBlockSolution(const CBlock& block, const Consensus::Params& consensusParams, int nHeight);
+// !ALPHA SIGNET FORK END
+
 /**
  * Generate the signet tx corresponding to the given block
  *

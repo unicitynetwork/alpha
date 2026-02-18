@@ -149,3 +149,35 @@ bool CheckSignetBlockSolution(const CBlock& block, const Consensus::Params& cons
     }
     return true;
 }
+
+// !ALPHA SIGNET FORK
+bool CheckSignetBlockSolution(const CBlock& block, const Consensus::Params& consensusParams, int nHeight)
+{
+    // Only enforce after activation height
+    if (consensusParams.nSignetActivationHeight <= 0 || nHeight < consensusParams.nSignetActivationHeight) {
+        return true;  // Pre-fork: no authorization required
+    }
+
+    // Use the Alpha-specific challenge script
+    const CScript challenge(consensusParams.signet_challenge_alpha.begin(), consensusParams.signet_challenge_alpha.end());
+    const std::optional<SignetTxs> signet_txs = SignetTxs::Create(block, challenge);
+
+    if (!signet_txs) {
+        LogPrint(BCLog::VALIDATION, "CheckSignetBlockSolution (Alpha fork): block solution parse failure at height %d\n", nHeight);
+        return false;
+    }
+
+    const CScript& scriptSig = signet_txs->m_to_sign.vin[0].scriptSig;
+    const CScriptWitness& witness = signet_txs->m_to_sign.vin[0].scriptWitness;
+
+    PrecomputedTransactionData txdata;
+    txdata.Init(signet_txs->m_to_sign, {signet_txs->m_to_spend.vout[0]});
+    TransactionSignatureChecker sigcheck(&signet_txs->m_to_sign, /*nInIn=*/ 0, /*amountIn=*/ signet_txs->m_to_spend.vout[0].nValue, txdata, MissingDataBehavior::ASSERT_FAIL);
+
+    if (!VerifyScript(scriptSig, signet_txs->m_to_spend.vout[0].scriptPubKey, &witness, BLOCK_SCRIPT_VERIFY_FLAGS, sigcheck)) {
+        LogPrint(BCLog::VALIDATION, "CheckSignetBlockSolution (Alpha fork): invalid block solution at height %d\n", nHeight);
+        return false;
+    }
+    return true;
+}
+// !ALPHA SIGNET FORK END

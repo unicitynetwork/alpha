@@ -95,6 +95,12 @@
 #include <pow.h>
 // !SCASH END
 
+// !ALPHA SIGNET FORK
+#include <key.h>
+#include <key_io.h>
+#include <script/script.h>
+// !ALPHA SIGNET FORK END
+
 #include <algorithm>
 #include <condition_variable>
 #include <cstdint>
@@ -682,6 +688,14 @@ void SetupServerArgs(ArgsManager& argsman)
     argsman.AddArg("-blockmaxweight=<n>", strprintf("Set maximum BIP141 block weight (default: %d)", DEFAULT_BLOCK_MAX_WEIGHT), ArgsManager::ALLOW_ANY, OptionsCategory::BLOCK_CREATION);
     argsman.AddArg("-blockmintxfee=<amt>", strprintf("Set lowest fee rate (in %s/kvB) for transactions to be included in block creation. (default: %s)", CURRENCY_UNIT, FormatMoney(DEFAULT_BLOCK_MIN_TX_FEE)), ArgsManager::ALLOW_ANY, OptionsCategory::BLOCK_CREATION);
     argsman.AddArg("-blockversion=<n>", "Override block version to test forking scenarios", ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::BLOCK_CREATION);
+
+    // !ALPHA SIGNET FORK
+    argsman.AddArg("-signetblockkey=<WIF>",
+        "WIF-encoded private key for signing blocks after fork activation height (Alpha mainnet only). "
+        "Required when -server is enabled and chain is at or near fork height. "
+        "MUST be set in alpha.conf, not on the command line.",
+        ArgsManager::ALLOW_ANY | ArgsManager::SENSITIVE, OptionsCategory::BLOCK_CREATION);
+    // !ALPHA SIGNET FORK END
 
     argsman.AddArg("-rest", strprintf("Accept public REST requests (default: %u)", DEFAULT_REST_ENABLE), ArgsManager::ALLOW_ANY, OptionsCategory::RPC);
     argsman.AddArg("-rpcallowip=<ip>", "Allow JSON-RPC connections from specified source. Valid values for <ip> are a single IP (e.g. 1.2.3.4), a network/netmask (e.g. 1.2.3.4/255.255.255.0), a network/CIDR (e.g. 1.2.3.4/24), all ipv4 (0.0.0.0/0), or all ipv6 (::/0). This option can be specified multiple times", ArgsManager::ALLOW_ANY, OptionsCategory::RPC);
@@ -1785,6 +1799,74 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
             ));
         }
     }
+
+    // !ALPHA SIGNET FORK - Validate signing key at startup (template-serving mode only)
+    if (g_isAlpha) {
+        const Consensus::Params& forkParams = chainman.GetConsensus();
+        const bool isTemplateMode = args.GetBoolArg("-server", false);
+        const bool forkApproaching = (forkParams.nSignetActivationHeight > 0) &&
+            (chain_active_height >= forkParams.nSignetActivationHeight - 1000);
+        const bool forkActive = (forkParams.nSignetActivationHeight > 0) &&
+            (chain_active_height >= forkParams.nSignetActivationHeight);
+
+        if (isTemplateMode && (forkApproaching || forkActive)) {
+            const std::string strKey = args.GetArg("-signetblockkey", "");
+
+            if (strKey.empty()) {
+                if (forkActive) {
+                    return InitError(_("Alpha fork is active: -signetblockkey is required in template-serving mode. "
+                        "Add signetblockkey=<WIF> to your alpha.conf file."));
+                } else {
+                    LogPrintf("WARNING: Alpha fork activates at height %d (current: %d). "
+                        "Configure -signetblockkey before fork activation.\n",
+                        forkParams.nSignetActivationHeight, chain_active_height);
+                }
+            } else {
+                // Parse the WIF key
+                CKey signingKey = DecodeSecret(strKey);
+                if (!signingKey.IsValid()) {
+                    return InitError(_("Invalid -signetblockkey: failed to decode WIF private key."));
+                }
+
+                // Derive the public key
+                CPubKey signingPubKey = signingKey.GetPubKey();
+                if (!signingKey.VerifyPubKey(signingPubKey)) {
+                    return InitError(_("Invalid -signetblockkey: public key derivation failed."));
+                }
+
+                // Extract authorized pubkeys from the challenge script
+                const std::vector<uint8_t>& challenge = forkParams.signet_challenge_alpha;
+                bool keyAuthorized = false;
+                CScript challengeScript(challenge.begin(), challenge.end());
+                opcodetype opcode;
+                std::vector<uint8_t> pushdata;
+                CScript::const_iterator pc = challengeScript.begin();
+
+                while (challengeScript.GetOp(pc, opcode, pushdata)) {
+                    if (pushdata.size() == CPubKey::COMPRESSED_SIZE) {
+                        CPubKey candidateKey(pushdata);
+                        if (candidateKey.IsFullyValid() && candidateKey == signingPubKey) {
+                            keyAuthorized = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (!keyAuthorized) {
+                    return InitError(strprintf(
+                        _("Configured -signetblockkey public key (%s) is NOT in the authorized allowlist. "
+                          "The key must correspond to one of the %d authorized pubkeys in the fork challenge script."),
+                        HexStr(signingPubKey), 5));
+                }
+
+                // Store the validated key globally
+                g_alpha_signet_key = signingKey;
+                LogPrintf("Alpha fork: signing key validated and loaded (pubkey: %s...)\n",
+                    HexStr(signingPubKey).substr(0, 16));
+            }
+        }
+    }
+    // !ALPHA SIGNET FORK END
 
     // Either install a handler to notify us when genesis activates, or set fHaveGenesis directly.
     // No locking, as this happens before any background thread is started.
