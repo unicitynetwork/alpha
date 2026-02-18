@@ -690,23 +690,19 @@ Note that internal nodes (those with `-signetblockkey` configured) do not need t
 +    if (g_isAlpha) {
 +        const Consensus::Params& forkParams = chainman.GetConsensus();
 +        const bool isTemplateMode = args.GetBoolArg("-server", false);
-+        const bool forkApproaching = (forkParams.nSignetActivationHeight > 0) &&
-+            (chain_active_height >= forkParams.nSignetActivationHeight - 1000);
 +        const bool forkActive = (forkParams.nSignetActivationHeight > 0) &&
 +            (chain_active_height >= forkParams.nSignetActivationHeight);
 +
-+        if (isTemplateMode && (forkApproaching || forkActive)) {
++        if (isTemplateMode && forkActive) {
 +            // ... key validation logic ...
 +        }
 +    }
 +    // !ALPHA SIGNET FORK END
 ```
 
-**Line-by-line explanation of the state machine:**
+**Line-by-line explanation:**
 
 - `isTemplateMode` -- `true` when `-server` is passed, meaning this node accepts RPC connections and can serve block templates. Nodes not in server mode (e.g., plain peers, offline signers, block explorers) do not need a signing key and are not validated.
-
-- `forkApproaching` -- `true` when the chain tip is within 1,000 blocks of the fork (i.e., block 449,000 or later). In this state, the node issues a warning but does not fail startup. This gives operators a window of approximately 33 hours (1,000 blocks × 2 minutes) to configure the key before it becomes mandatory.
 
 - `forkActive` -- `true` when the chain tip is at or past block 450,000. In this state, a server-mode node without a valid signing key logs a warning but continues to start normally. The node can sync the chain and serve as a full node; it just cannot produce signed block templates.
 
@@ -845,10 +841,7 @@ AppInitMain()
     |
     +-- if not g_isAlpha: skip
     +-- if not -server: skip (non-template nodes don't need a key)
-    +-- if chain_active_height < nSignetActivationHeight - 1000: skip (fork not approaching)
-    +-- if chain_active_height in [449000, 449999]:
-    |     if no -signetblockkey: log WARNING, continue
-    |     if -signetblockkey provided: validate and load
+    +-- if chain_active_height < nSignetActivationHeight: skip (fork not active)
     +-- if chain_active_height >= 450000:
     |     if no -signetblockkey: log WARNING, continue (node runs as non-mining full node)
     |     if -signetblockkey provided: validate and load
@@ -921,15 +914,6 @@ Alpha fork: signing key validated and loaded (pubkey: <first 16 chars>...)
 
 Confirm that the 16-character prefix matches the expected public key of your authorized key.
 
-**Warning window:** When the chain tip is within 1,000 blocks of the fork height (block 449,000 or later) and `-server` is active but no key is configured, the log will show:
-
-```
-WARNING: Alpha fork activates at height 450000 (current: 449XXX).
-Configure -signetblockkey before fork activation.
-```
-
-The node continues operating normally during this window. Operators have approximately 33 hours from block 449,000 to configure the key.
-
 ---
 
 ## Deployment Notes
@@ -957,7 +941,7 @@ The current code contains placeholder public keys in `src/kernel/chainparams.cpp
 
 5. **Verify the ASERT anchor.** The `asertAnchorPostFork.nBits` is computed from `consensus.powLimit`, which does not change between compiles. No action needed. The `nPrevBlockTime` is resolved at runtime.
 
-6. **Coordinate the deployment timeline.** The binary must be deployed to all full nodes on the network before block 450,000. The warning window (1,000 blocks before the fork, approximately 33 hours) exists to catch nodes that were not updated in time. Any node running old code at block 450,000 will have its `FatalError` timebomb trigger, forcing it offline. Nodes running the new code will transition seamlessly.
+6. **Coordinate the deployment timeline.** The binary must be deployed to all full nodes on the network before block 450,000. Any node running old code at block 450,000 will have its `FatalError` timebomb trigger, forcing it offline. Nodes running the new code will transition seamlessly.
 
 7. **Signed binary distribution.** The binary should be signed by a trusted key (e.g., a project GPG key) and the signature published alongside the release. Node operators should verify the signature before deploying.
 

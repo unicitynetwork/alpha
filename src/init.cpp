@@ -1804,23 +1804,15 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
     if (g_isAlpha) {
         const Consensus::Params& forkParams = chainman.GetConsensus();
         const bool isTemplateMode = args.GetBoolArg("-server", false);
-        const bool forkApproaching = (forkParams.nSignetActivationHeight > 0) &&
-            (chain_active_height >= forkParams.nSignetActivationHeight - 1000);
         const bool forkActive = (forkParams.nSignetActivationHeight > 0) &&
             (chain_active_height >= forkParams.nSignetActivationHeight);
 
-        if (isTemplateMode && (forkApproaching || forkActive)) {
+        if (isTemplateMode && forkActive) {
             const std::string strKey = args.GetArg("-signetblockkey", "");
 
             if (strKey.empty()) {
-                if (forkActive) {
-                    LogPrintf("WARNING: Alpha fork is active but no -signetblockkey configured. "
-                        "Block templates will be unavailable. Add signetblockkey=<WIF> to alpha.conf to enable mining.\n");
-                } else {
-                    LogPrintf("WARNING: Alpha fork activates at height %d (current: %d). "
-                        "Configure -signetblockkey before fork activation.\n",
-                        forkParams.nSignetActivationHeight, chain_active_height);
-                }
+                LogPrintf("WARNING: Alpha fork is active but no -signetblockkey configured. "
+                    "Block templates will be unavailable. Add signetblockkey=<WIF> to alpha.conf to enable mining.\n");
             } else {
                 // Parse the WIF key
                 CKey signingKey = DecodeSecret(strKey);
