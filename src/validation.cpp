@@ -2518,6 +2518,12 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
     // !ALPHA SIGNET FORK END
 
     CAmount blockReward = nFees + GetBlockSubsidy(pindex->nHeight, params.GetConsensus());
+    // !ALPHA SIGNET FORK - Burn transaction fees: miner reward is 0 post-fork
+    if (g_isAlpha && params.GetConsensus().nSignetActivationHeight > 0 &&
+        pindex->nHeight >= params.GetConsensus().nSignetActivationHeight) {
+        blockReward = 0;
+    }
+    // !ALPHA SIGNET FORK END
     if (block.vtx[0]->GetValueOut() > blockReward) {
         LogPrintf("ERROR: ConnectBlock(): coinbase pays too much (actual=%d vs limit=%d)\n", block.vtx[0]->GetValueOut(), blockReward);
         return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-cb-amount");

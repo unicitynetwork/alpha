@@ -29,7 +29,7 @@ At block height 450,000, the Alpha mainnet undergoes a programmatic hard fork th
 
 The fork implements three simultaneous consensus rule changes that activate atomically at block 450,000:
 
-1. **Zero block subsidy** -- The block reward drops from 5 ALPHA (post-halving from the 400,000-block halving) to 0. Block producers are compensated only by transaction fees. This eliminates the economic incentive for unauthorized miners to extend the chain.
+1. **Zero block subsidy and fee burning** -- The block reward drops to exactly 0: both the subsidy (via `GetBlockSubsidy` returning 0) and transaction fees are burned. Post-fork, `blockReward` is forced to 0 in `ConnectBlock`, so the coinbase output must have zero value. `CreateNewBlock` also sets `coinbaseTx.vout[0].nValue = 0` to produce compliant templates. This eliminates all economic incentive for unauthorized miners, since only authorized miners can produce blocks and they cannot collect fees.
 
 2. **Difficulty reset** -- The difficulty for block 450,000 is forced to `powLimit` (minimum difficulty), preventing a chain stall. After block 450,000, the existing ASERT anchor from block 70,232 continues to govern difficulty adjustment. Since the chain has maintained ~2-minute blocks, ASERT naturally computes a difficulty near `powLimit` for post-fork blocks.
 
@@ -57,8 +57,9 @@ Block 449,999 (last PoW block)
      v
 Block 450,000 (first fork block)
      |
-     +--- Subsidy check: GetBlockSubsidy(450000) returns 0
-     |     Coinbase value must be <= nFees only
+     +--- Subsidy + fee burn: GetBlockSubsidy(450000) returns 0
+     |     AND blockReward forced to 0 (fees burned)
+     |     Coinbase value must be exactly 0
      |
      +--- Difficulty: GetNextWorkRequired() returns nProofOfWorkLimit
      |     (minimum difficulty, so the block is trivially solvable)
@@ -430,6 +431,24 @@ Four new includes are required:
 
 The global variable definition (corresponding to the `extern` declaration in `miner.h`). `CKey` has a default constructor that leaves the key in an invalid state (`IsValid()` returns `false`), so this initial state correctly represents "no key configured."
 
+#### Fee burning: zero coinbase value post-fork
+
+```diff
+-    coinbaseTx.vout[0].nValue = nFees + GetBlockSubsidy(nHeight, chainparams.GetConsensus());
++    // !ALPHA SIGNET FORK - Burn transaction fees: coinbase value is 0 post-fork
++    if (g_isAlpha && chainparams.GetConsensus().nSignetActivationHeight > 0 &&
++        nHeight >= chainparams.GetConsensus().nSignetActivationHeight) {
++        coinbaseTx.vout[0].nValue = 0;
++    } else {
++        coinbaseTx.vout[0].nValue = nFees + GetBlockSubsidy(nHeight, chainparams.GetConsensus());
++    }
++    // !ALPHA SIGNET FORK END
+```
+
+This change ensures that the block template itself is created with a zero-value coinbase output post-fork, matching the `blockReward = 0` enforcement in `ConnectBlock`. The if/else structure preserves the original computation for pre-fork blocks. Post-fork, both the subsidy (already 0 via `GetBlockSubsidy`) and transaction fees are excluded from the coinbase output -- fees are effectively burned.
+
+#### Block template signing
+
 ```diff
 +    // !ALPHA SIGNET FORK - Sign block template for post-fork authorization
 +    if (g_isAlpha && chainparams.GetConsensus().nSignetActivationHeight > 0
@@ -560,7 +579,7 @@ After the difficulty reset at block 450,000, blocks 450,001 onward continue to u
 
 ### src/validation.cpp
 
-**Role:** The core block validation engine. Two distinct changes are made: a zero-subsidy enforcement in `GetBlockSubsidy`, and two calls to `CheckSignetBlockSolution` in the block connection pipeline. Additionally, the old "timebomb" forced shutdown at block 450,000 is removed.
+**Role:** The core block validation engine. Five distinct changes are made: a zero-subsidy enforcement in `GetBlockSubsidy`, a fee-burning override (`blockReward = 0`) in `ConnectBlock`, two calls to `CheckSignetBlockSolution` in the block connection pipeline, and the removal of the old "timebomb" forced shutdown at block 450,000.
 
 **Full path:** `/home/vrogojin/alpha/src/validation.cpp`
 
@@ -584,11 +603,18 @@ GetBlockSubsidy(450000):
   // halving at 400000 never reached for post-fork blocks
 ```
 
-The coinbase can still collect transaction fees; the constraint is on the mined subsidy portion. The existing check in `ConnectBlock`:
+After the zero subsidy, a second enforcement step burns transaction fees. In `ConnectBlock`, after computing `blockReward = nFees + GetBlockSubsidy(nHeight)` (which evaluates to `nFees + 0 = nFees`), the code forces `blockReward = 0` post-fork:
+
 ```cpp
-if (block.vtx[0]->GetValueOut() > blockReward)
+// !ALPHA SIGNET FORK - Burn transaction fees: miner reward is 0 post-fork
+if (g_isAlpha && params.GetConsensus().nSignetActivationHeight > 0 &&
+    pindex->nHeight >= params.GetConsensus().nSignetActivationHeight) {
+    blockReward = 0;
+}
+// !ALPHA SIGNET FORK END
 ```
-where `blockReward = nFees + GetBlockSubsidy(nHeight)`, will allow coinbase outputs summing to at most `nFees` (since subsidy is 0).
+
+This means post-fork coinbase outputs must sum to exactly 0. Any block with `coinbase.vout[0].nValue > 0` is rejected with `bad-cb-amount`. Transaction fees are effectively burned (destroyed) since no coinbase output can claim them. This removes the unfair competition advantage that authorized miners would otherwise have by collecting all fees.
 
 #### Change 2: ContextualCheckBlock signet check
 
@@ -769,7 +795,7 @@ BlockAssembler::CreateNewBlock(scriptPubKeyIn)
     |
     +-- Select transactions from mempool
     +-- Build coinbase tx:
-    |     - Output 0: scriptPubKeyIn (miner reward address, value = nFees + 0 subsidy)
+    |     - Output 0: scriptPubKeyIn (miner reward address, value = 0 post-fork; fees burned)
     |     - Output 1: OP_RETURN + witness commitment (AA21A9ED...)
     +-- Set block header fields (nBits = nProofOfWorkLimit for block 450000)
     |
@@ -835,9 +861,9 @@ ConnectBlock (if block passes all checks)
     +-- Execute all transactions
     +-- [ALPHA SIGNET FORK belt-and-suspenders]
     +-- CheckSignetBlockSolution(block, params, pindex->nHeight)
-    +-- Check coinbase value <= nFees + GetBlockSubsidy(nHeight)
-    |     GetBlockSubsidy returns 0 for nHeight >= 450000
-    |     So coinbase value must be <= nFees
+    +-- Check coinbase value <= blockReward (blockReward forced to 0 post-fork)
+    |     GetBlockSubsidy returns 0 AND blockReward overridden to 0
+    |     So coinbase value must be exactly 0 (fees burned)
     +-- Update UTXO set
 ```
 
@@ -1149,12 +1175,14 @@ The three-way coordination between zero subsidy, difficulty reset, and signet au
 
 - Block 449999: last pre-fork block. Normal rules.
 - Block 450000 (`nHeight == nSignetActivationHeight`):
-  - `GetBlockSubsidy` returns 0 (zero subsidy check triggers first).
+  - `GetBlockSubsidy` returns 0 (zero subsidy).
+  - `blockReward` forced to 0 in `ConnectBlock` (fees burned).
+  - `coinbaseTx.vout[0].nValue` set to 0 in `CreateNewBlock` (template compliance).
   - `GetNextWorkRequired` returns `powLimit` (difficulty reset).
   - `CheckSignetBlockSolution` requires a valid authorization signature.
   - The template for this block is produced by `CreateNewBlock` with the signing logic embedded.
 - Block 450001+:
-  - Subsidy remains 0.
+  - Subsidy remains 0, fees remain burned (`blockReward = 0`).
   - ASERT continues using the original anchor from block 70,232; since the chain has maintained ~2-minute blocks, the computed difficulty remains near `powLimit`.
   - Authorization required.
 
@@ -1185,10 +1213,10 @@ The three-way coordination between zero subsidy, difficulty reset, and signet au
 | `src/chainparamsbase.cpp` | Registered `-signetforkheight` and `-signetforkpubkeys` | CLI arg registration |
 | `src/signet.h` | Exported `SIGNET_HEADER` constant; added height-aware overload + `ExtractPubkeysFromChallenge` | Single source for SIGNET_HEADER; shared pubkey extraction helper |
 | `src/signet.cpp` | Added `VerifySignetChallenge` static helper; removed local SIGNET_HEADER; uses `signet_challenge` | Deduplicated verification kernel; height-gated signet check with explicit header rejection |
-| `src/validation.cpp` | 4 edits: zero subsidy, timebomb removal, 2 signet checks | Core consensus enforcement |
+| `src/validation.cpp` | 5 edits: zero subsidy, fee burning (`blockReward = 0`), timebomb removal, 2 signet checks | Core consensus enforcement |
 | `src/pow.cpp` | 1 edit: difficulty reset at fork height | Prevent chain stall at fork |
 | `src/node/miner.h` | Added global key declaration | `extern CKey g_alpha_signet_key` |
-| `src/node/miner.cpp` | Added key definition + template signing logic; uses `signet_challenge`; removed local SIGNET_HEADER | Embed BIP325 signet solution in block templates |
+| `src/node/miner.cpp` | Added key definition + template signing logic + fee burning (`coinbaseTx.vout[0].nValue = 0`); uses `signet_challenge`; removed local SIGNET_HEADER | Embed BIP325 signet solution in block templates; zero coinbase value post-fork |
 | `src/init.cpp` | Startup logging, CLI warning, refactored key validation using `signet_challenge` | Log fork params, warn on mainnet CLI args, use shared helper |
 | `src/rpc/mining.cpp` | Added informational RPC fields using `signet_challenge` | Expose challenge + active flag in `getblocktemplate` |
 
