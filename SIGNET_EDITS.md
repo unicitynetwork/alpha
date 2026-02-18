@@ -13,7 +13,6 @@
    - [src/node/miner.cpp](#srcnodeminer-cpp)
    - [src/pow.cpp](#srcpowcpp)
    - [src/validation.cpp](#srcvalidationcpp)
-   - [src/rpc/mining.cpp](#srcrpcminingcpp)
    - [src/init.cpp](#srcinitcpp)
 4. [Execution Flow](#execution-flow)
 5. [Configuration Guide](#configuration-guide)
@@ -42,8 +41,6 @@ In addition to the three consensus changes, four supporting infrastructure chang
 5. **Template signing** -- `CreateNewBlock()` automatically appends the SIGNET_HEADER and serialized signature to the coinbase witness commitment output of every block template it produces for heights >= 450,000. The Merkle root is recomputed after this modification.
 
 6. **New config parameter** -- `-signetblockkey=<WIF>` is registered as a `SENSITIVE` argument in the `BLOCK_CREATION` category.
-
-7. **RPC advertising** -- The `getblocktemplate` RPC response includes `alpha_signet_challenge` and `alpha_signet_active` fields when the fork is active, so external mining infrastructure can detect the transition.
 
 The approach deliberately reuses Bitcoin Core's existing `signet.cpp` / `SignetTxs` infrastructure rather than reimplementing the signing and verification logic from scratch. The only new code is the height-gated wrapper that activates the signet check at a specific block height on the Alpha mainnet, instead of being chain-wide as in Bitcoin's signet.
 
@@ -168,7 +165,7 @@ The `BuildSignetChallenge` helper (file-scope static in `kernel/chainparams.cpp`
 After initialization, the exact same `CheckSignetBlockSolution` code path runs for all chain types.
 
 **Cross-references:**
-- The `nSignetActivationHeight` value is read by `validation.cpp`, `pow.cpp`, `signet.cpp`, `node/miner.cpp`, `rpc/mining.cpp`, and `init.cpp`.
+- The `nSignetActivationHeight` value is read by `validation.cpp`, `pow.cpp`, `signet.cpp`, `node/miner.cpp`, and `init.cpp`.
 - The `signet_challenge` bytes are read by `signet.cpp` (validation), `node/miner.cpp` (signing), and `init.cpp` (key validation at startup). This is the same field that BIP325 signet chains use, but on Alpha chains `signet_blocks=false` prevents the original BIP325 checker from consuming it.
 
 ---
@@ -667,36 +664,6 @@ This removes the old mechanism that forced node shutdown at block 450,000. That 
 
 ---
 
-### src/rpc/mining.cpp
-
-**Role:** Implements the `getblocktemplate` RPC. The change adds informational fields to the template response that allow external mining infrastructure to detect when the signet fork is active.
-
-**Full path:** `/home/vrogojin/alpha/src/rpc/mining.cpp`
-
-```diff
-+    // !ALPHA SIGNET FORK
-+    if (g_isAlpha && consensusParams.nSignetActivationHeight > 0 &&
-+        (pindexPrev->nHeight + 1) >= consensusParams.nSignetActivationHeight) {
-+        result.pushKV("alpha_signet_challenge", HexStr(consensusParams.signet_challenge));
-+        result.pushKV("alpha_signet_active", true);
-+    }
-+    // !ALPHA SIGNET FORK END
-```
-
-**Line-by-line explanation:**
-
-Two new JSON fields are added to the `getblocktemplate` response when the fork is active:
-
-- `"alpha_signet_challenge"` -- The hex-encoded challenge script, sourced from `consensusParams.signet_challenge` (the same field used by `signet.cpp` and `miner.cpp`). External tools (custom mining pools, monitoring dashboards, block explorers) can use this to confirm which challenge is in effect and to independently verify that submitted blocks contain a valid solution. The format is the raw script bytes, identical to how Bitcoin's native signet challenge is reported for BIP325 signet chains.
-
-- `"alpha_signet_active"` -- A boolean flag. Its presence and `true` value signal to any client polling `getblocktemplate` that they are past the activation height and that block templates will have the signet solution pre-embedded. Clients that do not understand the Alpha fork can at least detect that something has changed.
-
-Note that internal nodes (those with `-signetblockkey` configured) do not need to inspect these fields: `CreateNewBlock` already embeds the signature automatically. These fields are primarily for external monitoring and for any third-party mining software that might need to understand the chain's state.
-
-**Cross-references:** This is a pure read-only change to the RPC output. No consensus rules are modified here.
-
----
-
 ### src/init.cpp
 
 **Role:** Implements `AppInitMain`, the node startup function, and `SetupServerArgs`, which registers all command-line and config-file arguments. Two changes are made: registration of `-signetblockkey`, and startup validation of the configured key.
@@ -1060,7 +1027,7 @@ alpha-cli -chain=alpharegtest generatetoaddress 9 $ADDR
 # Mine block 10 — zero subsidy, signed template
 alpha-cli -chain=alpharegtest generatetoaddress 1 $ADDR
 
-# Confirm getblocktemplate returns alpha_signet_active: true
+# Confirm getblocktemplate returns coinbasevalue: 0
 alpha-cli -chain=alpharegtest getblocktemplate '{"rules": ["segwit"]}'
 ```
 
@@ -1108,7 +1075,7 @@ A Python functional test in `test/functional/` should:
 2. Mine 9 blocks and verify subsidy is nonzero.
 3. Mine block 10 and verify subsidy is zero.
 4. Verify that block 10's coinbase contains the `SIGNET_HEADER` and a valid signature.
-5. Verify that `getblocktemplate` returns `alpha_signet_active: true` after block 10.
+5. Verify that `getblocktemplate` returns `coinbasevalue: 0` after block 10.
 6. Start a second regtest node with the same fork params but no `-signetblockkey`, verify that unsigned blocks are rejected with "missing SIGNET_HEADER".
 
 ---
@@ -1218,7 +1185,6 @@ The three-way coordination between zero subsidy, difficulty reset, and signet au
 | `src/node/miner.h` | Added global key declaration | `extern CKey g_alpha_signet_key` |
 | `src/node/miner.cpp` | Added key definition + template signing logic + fee burning (`coinbaseTx.vout[0].nValue = 0`); uses `signet_challenge`; removed local SIGNET_HEADER | Embed BIP325 signet solution in block templates; zero coinbase value post-fork |
 | `src/init.cpp` | Startup logging, CLI warning, refactored key validation using `signet_challenge` | Log fork params, warn on mainnet CLI args, use shared helper |
-| `src/rpc/mining.cpp` | Added informational RPC fields using `signet_challenge` | Expose challenge + active flag in `getblocktemplate` |
 
 ---
 
