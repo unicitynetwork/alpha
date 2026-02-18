@@ -82,28 +82,29 @@ The three changes interact in a specific order within the validation pipeline. D
 **Full path:** `/home/vrogojin/alpha/src/consensus/params.h`
 
 ```diff
-@@ -180,6 +180,12 @@ struct Params {
+@@ -180,6 +180,10 @@ struct Params {
      uint32_t RandomX_DiffMult;
      // !ALPHA END
- 
+
 +    // !ALPHA SIGNET FORK
 +    int nSignetActivationHeight{0};              // Height at which signet authorization activates (0 = never)
-+    std::vector<uint8_t> signet_challenge_alpha;  // Challenge script for height-gated signet (separate from signet_challenge)
++    // Challenge script stored in signet_challenge (safe because signet_blocks=false on Alpha chains,
++    // so native BIP325 code paths never read it)
 +    // !ALPHA SIGNET FORK END
-+
+
      // !SCASH END
  };
 ```
 
 **Line-by-line explanation:**
 
-- `int nSignetActivationHeight{0}` -- The block height at which the three consensus changes activate. The in-class initializer `{0}` means that if a chain (such as the original Bitcoin mainnet or signet) does not configure this field, the fork is permanently disabled. The value `0` is treated as "never" by every guard throughout the codebase (all guards test `> 0` before taking any action). On the Alpha mainnet this is set to `450000`; on testnet and regtest it is set to `200` for testing purposes.
+- `int nSignetActivationHeight{0}` -- The block height at which the three consensus changes activate. The in-class initializer `{0}` means that if a chain (such as the original Bitcoin mainnet or signet) does not configure this field, the fork is permanently disabled. The value `0` is treated as "never" by every guard throughout the codebase (all guards test `> 0` before taking any action). On the Alpha mainnet this is set to `450000`; on testnet and regtest it is configurable via CLI flags for testing purposes.
 
-- `std::vector<uint8_t> signet_challenge_alpha` -- The serialized Script that authorized block producers must satisfy. The name deliberately differs from the existing `signet_challenge` field (which belongs to the `signet_blocks` BIP325 chain-wide signet mechanism) to avoid any risk of confusion or accidental cross-activation. The type matches `signet_challenge` exactly so the same `CScript` construction idiom works: `CScript(signet_challenge_alpha.begin(), signet_challenge_alpha.end())`.
+- There is no longer a separate `signet_challenge_alpha` field. The challenge script is stored directly in the pre-existing `signet_challenge` field (of type `std::vector<uint8_t>`). This is safe because all three Alpha chain constructors set `consensus.signet_blocks = false`, which prevents the native BIP325 code path in the original `CheckSignetBlockSolution(block, params)` from reading the field. The height-gated Alpha overload is the only consumer of `signet_challenge` on Alpha chains.
 
-**Cross-references:** Every other modified file reads these two fields. The initializers here ensure backward compatibility: code compiled without any chain configuration will have `nSignetActivationHeight == 0` and all guards will silently pass.
+**Cross-references:** Every other modified file reads `nSignetActivationHeight` and `signet_challenge`. The in-class initializer `{0}` on `nSignetActivationHeight` ensures backward compatibility: code compiled without any chain configuration will have `nSignetActivationHeight == 0` and all guards will silently pass. The `signet_challenge` field already existed in `Params` and defaults to an empty vector.
 
-**Security implications:** Placing `nSignetActivationHeight{0}` in the struct definition rather than relying on absence of a configuration is a defensive choice. It guarantees that a new chain type inadvertently omitting this field cannot accidentally activate the fork, because the value defaults to "never active."
+**Security implications:** Reusing `signet_challenge` rather than adding a new field eliminates any risk of the two fields diverging if chainparams are edited. Placing `nSignetActivationHeight{0}` in the struct definition is a defensive choice: a new chain type inadvertently omitting this field cannot accidentally activate the fork, because the value defaults to "never active."
 
 ---
 
@@ -121,7 +122,7 @@ The three changes interact in a specific order within the validation pipeline. D
 +
 +        // 1-of-5 bare multisig challenge: OP_1 <pk1> <pk2> <pk3> <pk4> <pk5> OP_5 OP_CHECKMULTISIG
 +        // Replace placeholder pubkeys with actual 33-byte compressed pubkeys before deployment
-+        consensus.signet_challenge_alpha = ParseHex(
++        consensus.signet_challenge = ParseHex(
 +            "51"                                                              // OP_1
 +            "21" "PLACEHOLDER_PUBKEY_1_33_BYTES_HEX_66_CHARS_HERE_0000000001"  // push 33 bytes + pubkey 1
 +            "21" "PLACEHOLDER_PUBKEY_2_33_BYTES_HEX_66_CHARS_HERE_0000000002"  // push 33 bytes + pubkey 2
@@ -134,11 +135,13 @@ The three changes interact in a specific order within the validation pipeline. D
 +        // !ALPHA SIGNET FORK END
 ```
 
+Note: the mainnet constructor also sets `consensus.signet_blocks = false` (a pre-existing field) at the top of the constructor body, before the fork block. This guard ensures that the native BIP325 code path (the original two-argument `CheckSignetBlockSolution`) never reads `signet_challenge` on Alpha chains, preventing any interference between the two mechanisms.
+
 **Line-by-line explanation:**
 
 - `consensus.nSignetActivationHeight = 450000` -- Sets the fork activation height. This is the first block that must comply with all three new consensus rules.
 
-- `consensus.signet_challenge_alpha = ParseHex(...)` -- The challenge script is a 1-of-5 bare multisig in standard Script. The byte encoding is:
+- `consensus.signet_challenge = ParseHex(...)` -- The challenge script is stored in the pre-existing `signet_challenge` field. It encodes a 1-of-5 bare multisig in standard Script. The byte encoding is:
   - `0x51` = `OP_1` (minimum signature count required)
   - `0x21` = push 33 bytes (compressed public key length)
   - 66 hex characters = 33 bytes of compressed public key (one for each of the 5 authorized signers)
@@ -157,7 +160,7 @@ The testnet and regtest constructors now accept `AlphaSignetForkOptions` alongsi
 -signetforkheight=<n> -signetforkpubkeys=<hex1>,<hex2>,...
 ```
 
-When provided, `BuildSignetChallenge()` constructs a 1-of-N bare multisig from the supplied compressed pubkeys. This replaces the previous hardcoded `OP_TRUE` challenge, which allowed any block to pass post-fork validation -- making it impossible to test the actual signing/verification flow.
+When provided, `BuildSignetChallenge()` constructs a 1-of-N bare multisig from the supplied compressed pubkeys and assigns the result to `consensus.signet_challenge`. This replaces the previous hardcoded `OP_TRUE` challenge, which allowed any block to pass post-fork validation -- making it impossible to test the actual signing/verification flow.
 
 The `BuildSignetChallenge` helper (file-scope static in `kernel/chainparams.cpp`) uses `GetScriptForMultisig(1, pubkeys)` to produce the same script format as mainnet.
 
@@ -165,27 +168,42 @@ After initialization, the exact same `CheckSignetBlockSolution` code path runs f
 
 **Cross-references:**
 - The `nSignetActivationHeight` value is read by `validation.cpp`, `pow.cpp`, `signet.cpp`, `node/miner.cpp`, `rpc/mining.cpp`, and `init.cpp`.
-- The `signet_challenge_alpha` bytes are read by `signet.cpp` (validation), `node/miner.cpp` (signing), and `init.cpp` (key validation at startup).
+- The `signet_challenge` bytes are read by `signet.cpp` (validation), `node/miner.cpp` (signing), and `init.cpp` (key validation at startup). This is the same field that BIP325 signet chains use, but on Alpha chains `signet_blocks=false` prevents the original BIP325 checker from consuming it.
 
 ---
 
 ### src/signet.h
 
-**Role:** Public header declaring the `CheckSignetBlockSolution` function and the `SignetTxs` class. The `SignetTxs` class encapsulates the BIP325 synthetic transaction pair used both for signing (in `miner.cpp`) and for verification (in `signet.cpp` and `validation.cpp`).
+**Role:** Public header declaring the `CheckSignetBlockSolution` function and the `SignetTxs` class. The `SignetTxs` class encapsulates the BIP325 synthetic transaction pair used both for signing (in `miner.cpp`) and for verification (in `signet.cpp` and `validation.cpp`). After the refactoring, this header also exports the `SIGNET_HEADER` constant and the `ExtractPubkeysFromChallenge` helper.
 
 **Full path:** `/home/vrogojin/alpha/src/signet.h`
 
 ```diff
-@@ -16,6 +16,14 @@
+@@ -5,6 +5,9 @@
+ #include <pubkey.h>
+ #include <cstdint>
+ #include <optional>
+
++/** Four-byte magic header used to locate the signet commitment in the coinbase witness commitment. */
++inline constexpr uint8_t SIGNET_HEADER[4] = {0xec, 0xc7, 0xda, 0xa2};
++
+ /**
+  * Extract signature and check whether a block has a valid solution
   */
  bool CheckSignetBlockSolution(const CBlock& block, const Consensus::Params& consensusParams);
- 
+
 +// !ALPHA SIGNET FORK
 +/**
 + * Height-gated variant: check signet block solution only if height >= activation height.
-+ * Uses signet_challenge_alpha (not signet_challenge) from consensus params.
++ * Uses consensus.signet_challenge (safe because signet_blocks=false on Alpha chains).
 + */
 +bool CheckSignetBlockSolution(const CBlock& block, const Consensus::Params& consensusParams, int nHeight);
++
++/**
++ * Extract compressed pubkeys from a challenge script (e.g. bare multisig).
++ * Returns all valid 33-byte compressed pubkeys found as push data in the script.
++ */
++std::vector<CPubKey> ExtractPubkeysFromChallenge(const std::vector<uint8_t>& challenge);
 +// !ALPHA SIGNET FORK END
 +
  /**
@@ -194,37 +212,43 @@ After initialization, the exact same `CheckSignetBlockSolution` code path runs f
 
 **Line-by-line explanation:**
 
-A second overload of `CheckSignetBlockSolution` is declared, adding an `int nHeight` parameter. This overload is what every Alpha-specific call site uses. The original two-parameter version is left untouched to preserve compatibility with Bitcoin's signet chain type (the original version is called in `validation.cpp` for `signet_blocks` chains).
+- `inline constexpr uint8_t SIGNET_HEADER[4]` -- The four magic bytes are now exported from `signet.h` as an `inline constexpr` array. Moving the definition here makes it a single authoritative source shared by `signet.cpp`, `miner.cpp`, and any future consumer. The previous arrangement had `signet.cpp` defining it at file scope and `miner.cpp` redeclaring it as a local `static constexpr`, creating a silent duplication risk. The `inline` specifier (C++17) allows the definition to appear in a header included by multiple translation units without violating the One Definition Rule. The comment in `signet.cpp` now reads "SIGNET_HEADER is now defined in signet.h (inline constexpr)" to document the change.
 
-The two-parameter distinction is critical: calling the wrong overload would either always enforce signet (if the original is called with the Alpha challenge) or never enforce it height-gating (if the new one is called without passing the block height). By making the height a required parameter of the new overload, call sites cannot accidentally omit it.
+- `bool CheckSignetBlockSolution(..., int nHeight)` -- A second overload of `CheckSignetBlockSolution` is declared, adding an `int nHeight` parameter. This overload is what every Alpha-specific call site uses. The original two-parameter version is left untouched to preserve compatibility with Bitcoin's signet chain type (the original version is called in `validation.cpp` for `signet_blocks` chains). The comment now reads "Uses consensus.signet_challenge (safe because signet_blocks=false on Alpha chains)" reflecting that no separate field is needed.
+
+- `std::vector<CPubKey> ExtractPubkeysFromChallenge(const std::vector<uint8_t>& challenge)` -- Shared helper that decodes a challenge script and returns all valid 33-byte compressed public keys found within it. Used by `init.cpp` (startup key validation and logging) to avoid duplicating the opcode-iteration logic.
+
+The two-overload distinction is critical: calling the wrong overload would either always enforce signet (if the original is called with the Alpha challenge) or bypass height-gating (if the new one is called without passing the block height). By making the height a required parameter of the new overload, call sites cannot accidentally omit it.
 
 **Cross-references:**
-- Implemented in `src/signet.cpp` (the new body added at the bottom of the file).
-- Called in `src/validation.cpp` at two distinct call sites (in `ContextualCheckBlock` and in `ConnectBlock`).
+- `CheckSignetBlockSolution` (3-arg) and `ExtractPubkeysFromChallenge` are both implemented in `src/signet.cpp`.
+- Both are called from `src/validation.cpp` (two call sites), `src/node/miner.cpp`, and `src/init.cpp`.
+- `SIGNET_HEADER` is used in `src/signet.cpp` (via `FetchAndClearCommitmentSection`) and in `src/node/miner.cpp` (when embedding the solution into the coinbase).
 
 ---
 
 ### src/signet.cpp
 
-**Role:** Implements the BIP325 signet transaction pair construction (`SignetTxs::Create`) and the block solution checker. The new overload added here is the enforcement function that every validation path for Alpha blocks calls.
+**Role:** Implements the BIP325 signet transaction pair construction (`SignetTxs::Create`) and the block solution checkers. After the refactoring, the file contains a new static helper `VerifySignetChallenge` that deduplicates the verification logic shared between the two-argument and three-argument `CheckSignetBlockSolution` overloads, and a new `ExtractPubkeysFromChallenge` helper for startup key validation.
 
 **Full path:** `/home/vrogojin/alpha/src/signet.cpp`
 
 ```diff
-+// !ALPHA SIGNET FORK
-+bool CheckSignetBlockSolution(const CBlock& block, const Consensus::Params& consensusParams, int nHeight)
+-// static constexpr uint8_t SIGNET_HEADER[4] = {0xec, 0xc7, 0xda, 0xa2};
++// SIGNET_HEADER is now defined in signet.h (inline constexpr)
+
++/**
++ * Shared verification kernel: constructs the signet transaction pair from the
++ * block and challenge, then verifies the script signature.
++ * Returns true if the block's signet signature satisfies the challenge.
++ */
++static bool VerifySignetChallenge(const CBlock& block, const std::vector<uint8_t>& challenge)
 +{
-+    // Only enforce after activation height
-+    if (consensusParams.nSignetActivationHeight <= 0 || nHeight < consensusParams.nSignetActivationHeight) {
-+        return true;  // Pre-fork: no authorization required
-+    }
-+
-+    // Use the Alpha-specific challenge script
-+    const CScript challenge(consensusParams.signet_challenge_alpha.begin(), consensusParams.signet_challenge_alpha.end());
-+    const std::optional<SignetTxs> signet_txs = SignetTxs::Create(block, challenge);
++    const CScript script_challenge(challenge.begin(), challenge.end());
++    const std::optional<SignetTxs> signet_txs = SignetTxs::Create(block, script_challenge);
 +
 +    if (!signet_txs) {
-+        LogPrint(BCLog::VALIDATION, "CheckSignetBlockSolution (Alpha fork): block solution parse failure at height %d\n", nHeight);
++        LogPrint(BCLog::VALIDATION, "VerifySignetChallenge: SignetTxs::Create failed (parse error or missing witness commitment)\n");
 +        return false;
 +    }
 +
@@ -233,9 +257,60 @@ The two-parameter distinction is critical: calling the wrong overload would eith
 +
 +    PrecomputedTransactionData txdata;
 +    txdata.Init(signet_txs->m_to_sign, {signet_txs->m_to_spend.vout[0]});
-+    TransactionSignatureChecker sigcheck(&signet_txs->m_to_sign, /*nInIn=*/ 0, /*amountIn=*/ signet_txs->m_to_spend.vout[0].nValue, txdata, MissingDataBehavior::ASSERT_FAIL);
++    TransactionSignatureChecker sigcheck(&signet_txs->m_to_sign, /*nInIn=*/ 0,
++        /*amountIn=*/ signet_txs->m_to_spend.vout[0].nValue, txdata, MissingDataBehavior::ASSERT_FAIL);
 +
-+    if (!VerifyScript(scriptSig, signet_txs->m_to_spend.vout[0].scriptPubKey, &witness, BLOCK_SCRIPT_VERIFY_FLAGS, sigcheck)) {
++    return VerifyScript(scriptSig, signet_txs->m_to_spend.vout[0].scriptPubKey,
++        &witness, BLOCK_SCRIPT_VERIFY_FLAGS, sigcheck);
++}
+
+ // Signet block solution checker (native BIP325 -- used when signet_blocks=true)
+ bool CheckSignetBlockSolution(const CBlock& block, const Consensus::Params& consensusParams)
+ {
+     if (block.GetHash() == consensusParams.hashGenesisBlock) return true;
+-    // ... inline VerifyScript logic ...
++    if (!VerifySignetChallenge(block, consensusParams.signet_challenge)) {
++        LogPrint(BCLog::VALIDATION, "CheckSignetBlockSolution: Errors in block (block solution invalid)\n");
++        return false;
++    }
++    return true;
+ }
+
++// !ALPHA SIGNET FORK
++std::vector<CPubKey> ExtractPubkeysFromChallenge(const std::vector<uint8_t>& challenge) { ... }
++
++bool CheckSignetBlockSolution(const CBlock& block, const Consensus::Params& consensusParams, int nHeight)
++{
++    // Only enforce after activation height
++    if (consensusParams.nSignetActivationHeight <= 0 || nHeight < consensusParams.nSignetActivationHeight) {
++        return true;  // Pre-fork: no authorization required
++    }
++
++    if (consensusParams.signet_challenge.empty()) {
++        LogPrint(BCLog::VALIDATION, "CheckSignetBlockSolution (Alpha fork): no challenge configured at height %d\n", nHeight);
++        return false;
++    }
++
++    // Explicit SIGNET_HEADER check — reject blocks without it
++    if (block.vtx.empty()) return false;
++    const int cidx = GetWitnessCommitmentIndex(block);
++    if (cidx == NO_WITNESS_COMMITMENT) {
++        LogPrint(BCLog::VALIDATION, "CheckSignetBlockSolution (Alpha fork): no witness commitment at height %d\n", nHeight);
++        return false;
++    }
++    {
++        // Work on a copy — FetchAndClearCommitmentSection mutates its argument
++        CScript commitment_copy = block.vtx[0]->vout.at(cidx).scriptPubKey;
++        std::vector<uint8_t> dummy;
++        if (!FetchAndClearCommitmentSection(SIGNET_HEADER, commitment_copy, dummy)) {
++            LogPrint(BCLog::VALIDATION, "CheckSignetBlockSolution (Alpha fork): "
++                "missing SIGNET_HEADER at height %d\n", nHeight);
++            return false;
++        }
++    }
++
++    // Standard signet verification using shared helper
++    if (!VerifySignetChallenge(block, consensusParams.signet_challenge)) {
 +        LogPrint(BCLog::VALIDATION, "CheckSignetBlockSolution (Alpha fork): invalid block solution at height %d\n", nHeight);
 +        return false;
 +    }
@@ -246,40 +321,49 @@ The two-parameter distinction is critical: calling the wrong overload would eith
 
 **Line-by-line explanation:**
 
-- **Height guard** (`nSignetActivationHeight <= 0 || nHeight < nSignetActivationHeight`) -- Returns `true` immediately for any block before the fork height. This is the single gate that makes the entire mechanism height-conditional. On chains where `nSignetActivationHeight` is zero (all non-Alpha chains), this always short-circuits.
+- **`SIGNET_HEADER` removal** -- The file-scope `static constexpr uint8_t SIGNET_HEADER[4]` definition has been removed from `signet.cpp`. The constant is now obtained from the `signet.h` header via the `inline constexpr` definition. The comment at line 26 reads "SIGNET_HEADER is now defined in signet.h (inline constexpr)" to document this change.
 
-- **Empty challenge guard** -- If `signet_challenge_alpha` is empty (fork disabled or not configured), returns `false` with a log message. This prevents silent pass-through.
+- **`VerifySignetChallenge` static helper** -- A new `static bool VerifySignetChallenge(const CBlock& block, const std::vector<uint8_t>& challenge)` function deduplicates the shared verification kernel: `SignetTxs::Create` -> `PrecomputedTransactionData` -> `TransactionSignatureChecker` -> `VerifyScript`. This logic was previously written out inline in both the two-argument overload (for native BIP325 chains) and the three-argument overload (for Alpha). Extracting it into a shared static function means there is now a single place where the verification sequence is defined, reducing the risk of the two overloads diverging.
 
-- **Explicit SIGNET_HEADER check** -- Before calling `SignetTxs::Create`, the function now independently verifies that the coinbase witness commitment contains the `SIGNET_HEADER` magic bytes (`{0xec, 0xc7, 0xda, 0xa2}`). This closes the fragile implicit rejection path: previously, blocks missing the header relied on `VerifyScript` failing against a real multisig challenge (empty scriptSig fails multisig). The explicit check uses `FetchAndClearCommitmentSection` on a copy of the commitment script and rejects immediately if the header is absent, with a "missing SIGNET_HEADER" log message.
+- **Two-argument overload** -- The original `CheckSignetBlockSolution(block, params)` now calls `VerifySignetChallenge(block, consensusParams.signet_challenge)` instead of containing inline verification code. The behavior is identical; only the structure has changed.
 
-- **`ExtractPubkeysFromChallenge`** -- New shared helper function (declared in `signet.h`, implemented in `signet.cpp`) that extracts all valid 33-byte compressed pubkeys from a challenge script by iterating its opcodes. Used by both `init.cpp` (startup key validation, startup logging) to avoid code duplication.
+- **Height guard** in the three-argument overload (`nSignetActivationHeight <= 0 || nHeight < nSignetActivationHeight`) -- Returns `true` immediately for any block before the fork height. This is the single gate that makes the entire mechanism height-conditional. On chains where `nSignetActivationHeight` is zero (all non-Alpha chains), this always short-circuits.
 
-- **`SignetTxs::Create(block, challenge)`** -- Calls the existing BIP325 transaction pair factory. This function:
+- **Empty challenge guard** -- If `signet_challenge` is empty (fork disabled or not configured), returns `false` with a log message. This prevents silent pass-through on misconfigured chains.
+
+- **Explicit SIGNET_HEADER check** -- Before calling `VerifySignetChallenge`, the function independently verifies that the coinbase witness commitment contains the `SIGNET_HEADER` magic bytes (`{0xec, 0xc7, 0xda, 0xa2}`). This closes the fragile implicit rejection path: previously, blocks missing the header relied on `VerifyScript` failing against a real multisig challenge (empty scriptSig fails multisig). The explicit check uses `FetchAndClearCommitmentSection` on a copy of the commitment script and rejects immediately if the header is absent, with a "missing SIGNET_HEADER" log message. Working on a copy is required because `FetchAndClearCommitmentSection` mutates its argument.
+
+- **`VerifySignetChallenge(block, consensusParams.signet_challenge)`** -- The three-argument overload now uses `consensusParams.signet_challenge` (not a removed `signet_challenge_alpha` field). This is safe because all Alpha chain constructors set `signet_blocks = false`, which prevents the native BIP325 two-argument checker from running on Alpha chains.
+
+- **`ExtractPubkeysFromChallenge`** -- New shared helper function (declared in `signet.h`, implemented in `signet.cpp`) that extracts all valid 33-byte compressed pubkeys from a challenge script by iterating its opcodes. Used by `init.cpp` (startup key validation, startup logging) to avoid code duplication.
+
+- **`SignetTxs::Create(block, challenge)`** -- Called inside `VerifySignetChallenge`. This function:
   1. Creates a synthetic "to_spend" transaction with a single output whose `scriptPubKey` is the challenge script.
   2. Finds the witness commitment in the coinbase output.
   3. Searches the witness commitment for the `SIGNET_HEADER` (`{0xec, 0xc7, 0xda, 0xa2}`).
   4. Extracts and removes the signet solution bytes from the commitment.
   5. Deserializes those bytes as a `scriptSig` and witness stack into the "to_sign" spending transaction.
   6. Computes a modified Merkle root using the coinbase without the signet solution, and commits that root into the "to_spend" output's scriptSig.
-  
-  If any step fails (no witness commitment, extraneous data after the solution, deserialization error), `SignetTxs::Create` returns `std::nullopt` and the function returns `false`. Note: `SignetTxs::Create` itself does not require `SIGNET_HEADER` to be present — but this is now irrelevant because the explicit `SIGNET_HEADER` check added before the `SignetTxs::Create` call rejects any block missing the header before it reaches this point. All post-fork blocks on all chain types must contain the `SIGNET_HEADER` in the coinbase witness commitment.
 
-- **`VerifyScript` call** -- Runs the Script interpreter against the extracted `scriptSig` and witness using `BLOCK_SCRIPT_VERIFY_FLAGS`. These flags (defined at the top of `signet.cpp` as `SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_WITNESS | SCRIPT_VERIFY_DERSIG | SCRIPT_VERIFY_NULLDUMMY`) are the same flags used by the original `CheckSignetBlockSolution`. For the 1-of-5 bare multisig, the interpreter evaluates the `scriptSig` (which contains the signature) against the `scriptPubKey` (which is the challenge). The `SCRIPT_VERIFY_NULLDUMMY` flag enforces the BIP147 rule that the mandatory dummy element in `OP_CHECKMULTISIG` must be an empty byte vector.
+  If any step fails (no witness commitment, extraneous data after the solution, deserialization error), `SignetTxs::Create` returns `std::nullopt` and `VerifySignetChallenge` returns `false`. For the three-argument overload, the explicit `SIGNET_HEADER` check that precedes the `VerifySignetChallenge` call guarantees that any block reaching this point already contains the header.
+
+- **`VerifyScript` call** (inside `VerifySignetChallenge`) -- Runs the Script interpreter against the extracted `scriptSig` and witness using `BLOCK_SCRIPT_VERIFY_FLAGS`. These flags (defined at the top of `signet.cpp` as `SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_WITNESS | SCRIPT_VERIFY_DERSIG | SCRIPT_VERIFY_NULLDUMMY`) are the same flags used by the original `CheckSignetBlockSolution`. The `SCRIPT_VERIFY_NULLDUMMY` flag enforces the BIP147 rule that the mandatory dummy element in `OP_CHECKMULTISIG` must be an empty byte vector.
 
 - **Logging** -- Uses `LogPrint(BCLog::VALIDATION, ...)` which only emits output when the `validation` debug category is enabled (`-debug=validation`). This matches the logging pattern in the original `CheckSignetBlockSolution` and avoids noisy output on nodes that are not actively debugging validation.
 
 **Security implications:**
 
-The new function is structurally identical to the original `CheckSignetBlockSolution`, differing only in:
+The three-argument overload is now structurally identical to the original `CheckSignetBlockSolution` in terms of verification logic (both delegate to `VerifySignetChallenge`), differing only in:
 1. The height gate at the top.
-2. Reading `signet_challenge_alpha` instead of `signet_challenge`.
-3. Including `nHeight` in log messages for better diagnostics.
+2. Reading `signet_challenge` via the Alpha-safe path (guarded by `signet_blocks=false`).
+3. The explicit `SIGNET_HEADER` pre-check before calling `VerifySignetChallenge`.
+4. Including `nHeight` in log messages for better diagnostics.
 
-By reusing `SignetTxs::Create` and `VerifyScript` without modification, the implementation inherits all the security properties of the original signet implementation, including protection against malleability (the modified Merkle root commits to the block contents without the signature, so signing happens over a canonical form of the block).
+By extracting `VerifySignetChallenge` as a shared helper, any future changes to the verification pipeline (e.g., new script flags) automatically apply to both the native BIP325 path and the Alpha height-gated path.
 
 **Cross-references:**
 - `SignetTxs::Create` is also called in `src/node/miner.cpp` during block template creation.
-- The `SIGNET_HEADER` constant (`{0xec, 0xc7, 0xda, 0xa2}`) is defined at the top of `signet.cpp` (line 26) and reused as a local definition in `miner.cpp`.
+- The `SIGNET_HEADER` constant (`{0xec, 0xc7, 0xda, 0xa2}`) is now defined in `signet.h` and shared by both `signet.cpp` and `miner.cpp`.
 
 ---
 
@@ -335,7 +419,7 @@ The use of a global variable for the signing key is a pragmatic choice that mirr
 Four new includes are required:
 - `<script/sign.h>` -- Provides `ProduceSignature`, `MutableTransactionSignatureCreator`, `SignatureData`, and `UpdateInput`.
 - `<script/signingprovider.h>` -- Provides `FlatSigningProvider`, the in-memory key store used during signing.
-- `<signet.h>` -- Provides `SignetTxs::Create` and `GetWitnessCommitmentIndex`.
+- `<signet.h>` -- Provides `SignetTxs::Create`, `GetWitnessCommitmentIndex`, and the exported `SIGNET_HEADER` constant.
 - `<streams.h>` -- Provides `VectorWriter`, used to serialize the signet solution into a byte vector.
 
 ```diff
@@ -356,13 +440,14 @@ The global variable definition (corresponding to the `extern` declaration in `mi
 +        }
 +
 +        const Consensus::Params& cparams = chainparams.GetConsensus();
-+        const CScript challenge(cparams.signet_challenge_alpha.begin(),
-+                               cparams.signet_challenge_alpha.end());
++        const CScript challenge(cparams.signet_challenge.begin(),
++                               cparams.signet_challenge.end());
 +
 +        // Create the signet signing transaction pair
 +        const std::optional<SignetTxs> signet_txs = SignetTxs::Create(*pblock, challenge);
 +        if (!signet_txs) {
-+            throw std::runtime_error(...);
++            throw std::runtime_error(strprintf(
++                "%s: Failed to create signet transactions for signing at height %d", __func__, nHeight));
 +        }
 +
 +        // Sign the spending transaction using the configured key
@@ -380,7 +465,8 @@ The global variable definition (corresponding to the `extern` declaration in `mi
 +            challenge, sigdata);
 +
 +        if (!signed_ok) {
-+            throw std::runtime_error(...);
++            throw std::runtime_error(strprintf(
++                "%s: Failed to produce signet signature at height %d", __func__, nHeight));
 +        }
 +        UpdateInput(tx_signing.vin[0], sigdata);
 +
@@ -391,10 +477,11 @@ The global variable definition (corresponding to the `extern` declaration in `mi
 +        writer << tx_signing.vin[0].scriptWitness.stack;
 +
 +        // Append SIGNET_HEADER + solution to witness commitment output
-+        static constexpr uint8_t SIGNET_HEADER[4] = {0xec, 0xc7, 0xda, 0xa2};
++        // SIGNET_HEADER is defined in signet.h
 +        int commitpos = GetWitnessCommitmentIndex(*pblock);
 +        if (commitpos == NO_WITNESS_COMMITMENT) {
-+            throw std::runtime_error(...);
++            throw std::runtime_error(strprintf(
++                "%s: No witness commitment in block for signet signing at height %d", __func__, nHeight));
 +        }
 +
 +        CMutableTransaction mtx_coinbase(*pblock->vtx[0]);
@@ -423,24 +510,26 @@ This ordering is required because `SignetTxs::Create` reads the block's witness 
 
 1. **Guard check** -- `g_alpha_signet_key.IsValid()` is checked to catch calls from nodes that started without a signing key configured. Since the startup validation only logs a warning (rather than refusing to start) when the fork is active and no key is present, this guard ensures that any RPC caller requesting a block template receives a clear error message rather than producing an invalid block.
 
-2. **`SignetTxs::Create(*pblock, challenge)`** -- When called during signing, the block's coinbase will have a witness commitment but no `SIGNET_HEADER` section yet. In this case `FetchAndClearCommitmentSection` does not find the header, `signet_solution` remains empty, and `tx_spending.vin[0].scriptSig` and `witness.stack` are both empty. The signing transaction pair is constructed with an empty spending input, which is what will be signed.
+2. **Challenge construction** -- `cparams.signet_challenge` is the same field set in `chainparams.cpp` via `consensus.signet_challenge = ParseHex(...)`. Because `signet_blocks = false` on Alpha chains, the native BIP325 checker never reads this field; the signing code here is the only consumer on Alpha chains.
 
-3. **`FlatSigningProvider` setup** -- A minimal in-memory key store is constructed containing only the signing key. This is the correct approach because `ProduceSignature` is a generic signing function that works with any `SigningProvider`; using `FlatSigningProvider` with a single key avoids any wallet dependency.
+3. **`SignetTxs::Create(*pblock, challenge)`** -- When called during signing, the block's coinbase will have a witness commitment but no `SIGNET_HEADER` section yet. In this case `FetchAndClearCommitmentSection` does not find the header, `signet_solution` remains empty, and `tx_spending.vin[0].scriptSig` and `witness.stack` are both empty. The signing transaction pair is constructed with an empty spending input, which is what will be signed.
 
-4. **`ProduceSignature`** -- Generates a DER-encoded ECDSA signature using `SIGHASH_ALL`. For a 1-of-5 multisig challenge, `ProduceSignature` will construct a `scriptSig` of the form `OP_0 <sig>` (with the mandatory null dummy for `OP_CHECKMULTISIG`). The signature commits to the hash of the synthetic spending transaction, which itself commits to the modified Merkle root (block contents without the signet solution).
+4. **`FlatSigningProvider` setup** -- A minimal in-memory key store is constructed containing only the signing key. This is the correct approach because `ProduceSignature` is a generic signing function that works with any `SigningProvider`; using `FlatSigningProvider` with a single key avoids any wallet dependency.
 
-5. **`UpdateInput`** -- Applies the generated `sigdata` back to `tx_signing.vin[0]`, populating `scriptSig` and `scriptWitness.stack`.
+5. **`ProduceSignature`** -- Generates a DER-encoded ECDSA signature using `SIGHASH_ALL`. For a 1-of-5 multisig challenge, `ProduceSignature` will construct a `scriptSig` of the form `OP_0 <sig>` (with the mandatory null dummy for `OP_CHECKMULTISIG`). The signature commits to the hash of the synthetic spending transaction, which itself commits to the modified Merkle root (block contents without the signet solution).
 
-6. **Serialization** -- The signet solution format is: Bitcoin-serialized `scriptSig` followed by Bitcoin-serialized `scriptWitness.stack` (as a vector of vectors). Both are written using `VectorWriter` which produces the same wire encoding that `SpanReader` in `SignetTxs::Create` expects to read back during validation.
+6. **`UpdateInput`** -- Applies the generated `sigdata` back to `tx_signing.vin[0]`, populating `scriptSig` and `scriptWitness.stack`.
 
-7. **Embedding into the coinbase** -- The `SIGNET_HEADER` (`{0xec, 0xc7, 0xda, 0xa2}`) is prepended to the solution bytes, and the combined byte array is appended as a push to the witness commitment output's `scriptPubKey`. The `<<` operator on `CScript` performs a minimal push, so the data will be pushed as a `OP_PUSHDATA` instruction of appropriate length. This is exactly the format that `FetchAndClearCommitmentSection` searches for: a push whose data begins with the 4-byte magic header.
+7. **Serialization** -- The signet solution format is: Bitcoin-serialized `scriptSig` followed by Bitcoin-serialized `scriptWitness.stack` (as a vector of vectors). Both are written using `VectorWriter` which produces the same wire encoding that `SpanReader` in `SignetTxs::Create` expects to read back during validation.
 
-8. **Merkle root recomputation** -- Modifying the coinbase transaction changes its hash, which changes the Merkle root. `BlockMerkleRoot(*pblock)` recomputes this. The nonce field is not re-initialized because the miner will overwrite it during PoW search anyway. The block template returned by `CreateNewBlock` still has `nNonce = 0`.
+8. **Embedding into the coinbase** -- The `SIGNET_HEADER` (`{0xec, 0xc7, 0xda, 0xa2}`) is prepended to the solution bytes, and the combined byte array is appended as a push to the witness commitment output's `scriptPubKey`. The `<<` operator on `CScript` performs a minimal push, so the data will be pushed as an `OP_PUSHDATA` instruction of appropriate length. This is exactly the format that `FetchAndClearCommitmentSection` searches for: a push whose data begins with the 4-byte magic header. The comment in the code now reads "SIGNET_HEADER is defined in signet.h" to reflect the fact that the local `static constexpr` duplicate has been removed.
 
-9. **`TestBlockValidity`** -- The existing call to `TestBlockValidity` at the end of `CreateNewBlock` (which runs after the signet block shown above) will now validate the signed template. This means `ContextualCheckBlock` (which calls `CheckSignetBlockSolution`) runs on the template before it is handed to the miner, providing early detection of any signing errors.
+9. **Merkle root recomputation** -- Modifying the coinbase transaction changes its hash, which changes the Merkle root. `BlockMerkleRoot(*pblock)` recomputes this. The nonce field is not re-initialized because the miner will overwrite it during PoW search anyway. The block template returned by `CreateNewBlock` still has `nNonce = 0`.
+
+10. **`TestBlockValidity`** -- The existing call to `TestBlockValidity` at the end of `CreateNewBlock` (which runs after the signet block shown above) will now validate the signed template. This means `ContextualCheckBlock` (which calls `CheckSignetBlockSolution`) runs on the template before it is handed to the miner, providing early detection of any signing errors.
 
 **Cross-references:**
-- The `SIGNET_HEADER` constant is identical to the one defined at the top of `signet.cpp` (line 26). It is redeclared as a local `static constexpr` in `miner.cpp` to avoid introducing an unnecessary dependency on signet's internal translation unit.
+- The `SIGNET_HEADER` constant is now sourced from `signet.h` (via the `#include <signet.h>` already present). The previous local `static constexpr uint8_t SIGNET_HEADER[4]` definition has been removed.
 - The witness commitment index is found using `GetWitnessCommitmentIndex` from `<consensus/merkle.h>` (already included transitively).
 
 ---
@@ -562,7 +651,7 @@ This removes the old mechanism that forced node shutdown at block 450,000. That 
 +    // !ALPHA SIGNET FORK
 +    if (g_isAlpha && consensusParams.nSignetActivationHeight > 0 &&
 +        (pindexPrev->nHeight + 1) >= consensusParams.nSignetActivationHeight) {
-+        result.pushKV("alpha_signet_challenge", HexStr(consensusParams.signet_challenge_alpha));
++        result.pushKV("alpha_signet_challenge", HexStr(consensusParams.signet_challenge));
 +        result.pushKV("alpha_signet_active", true);
 +    }
 +    // !ALPHA SIGNET FORK END
@@ -572,7 +661,7 @@ This removes the old mechanism that forced node shutdown at block 450,000. That 
 
 Two new JSON fields are added to the `getblocktemplate` response when the fork is active:
 
-- `"alpha_signet_challenge"` -- The hex-encoded challenge script. External tools (custom mining pools, monitoring dashboards, block explorers) can use this to confirm which challenge is in effect and to independently verify that submitted blocks contain a valid solution. The format is the raw script bytes, identical to how `signet_challenge` is reported for BIP325 signet chains.
+- `"alpha_signet_challenge"` -- The hex-encoded challenge script, sourced from `consensusParams.signet_challenge` (the same field used by `signet.cpp` and `miner.cpp`). External tools (custom mining pools, monitoring dashboards, block explorers) can use this to confirm which challenge is in effect and to independently verify that submitted blocks contain a valid solution. The format is the raw script bytes, identical to how Bitcoin's native signet challenge is reported for BIP325 signet chains.
 
 - `"alpha_signet_active"` -- A boolean flag. Its presence and `true` value signal to any client polling `getblocktemplate` that they are past the activation height and that block templates will have the signet solution pre-embedded. Clients that do not understand the Alpha fork can at least detect that something has changed.
 
@@ -651,7 +740,7 @@ The key validation procedure when a key is provided:
 
 2. **Public key derivation** -- `signingKey.GetPubKey()` derives the compressed 33-byte public key. `VerifyPubKey(signingPubKey)` signs a test message and verifies it to confirm the key pair is internally consistent. This catches any implementation-level inconsistency.
 
-3. **Allowlist check** -- The challenge script is decoded opcode by opcode using `CScript::GetOp`. The loop scans all push data elements of exactly 33 bytes (`CPubKey::COMPRESSED_SIZE`), treating each as a candidate compressed public key. If any candidate key matches `signingPubKey`, `keyAuthorized` is set to `true`. The loop uses `CPubKey::IsFullyValid()` to skip any 33-byte push that is not actually a valid secp256k1 point (this is defensive, since the challenge script should always contain valid keys). If no match is found, startup fails with an error message naming the derived public key hex and the count of authorized keys (hardcoded as 5 in the error message, consistent with the mainnet challenge).
+3. **Allowlist check** -- The challenge is read from `forkParams.signet_challenge`. The shared `ExtractPubkeysFromChallenge(forkParams.signet_challenge)` helper (declared in `signet.h`, implemented in `signet.cpp`) iterates the script opcodes and returns all valid 33-byte compressed public keys. The startup code iterates the returned list; if any key matches `signingPubKey`, `keyAuthorized` is set to `true`. Each candidate key is validated with `CPubKey::IsFullyValid()` to skip any 33-byte push that is not an actual secp256k1 point (this is defensive, since the challenge script should always contain valid keys). If no match is found, startup fails with an error message that includes the derived public key hex and the count of authorized keys derived dynamically from the challenge (not hardcoded).
 
 4. **Key storage** -- `g_alpha_signet_key = signingKey` stores the validated key in the global variable declared in `miner.h`. This is the only place in the codebase where `g_alpha_signet_key` is written.
 
@@ -870,7 +959,7 @@ signetblockkey=KwDiBf89QgGbjEhKnhXJuH7LrciVrZi3qYjgd9M7rFfX3tRkvVt
 chmod 600 ~/.alpha/alpha.conf
 ```
 
-**Key authorization:** The WIF key's corresponding public key must match one of the five public keys embedded in `consensus.signet_challenge_alpha` in `src/kernel/chainparams.cpp`. If it does not, the node refuses to start with the error:
+**Key authorization:** The WIF key's corresponding public key must match one of the five public keys embedded in `consensus.signet_challenge` in `src/kernel/chainparams.cpp`. If it does not, the node refuses to start with the error:
 
 ```
 Error: Configured -signetblockkey public key (<hex>) is NOT in the authorized allowlist.
@@ -895,7 +984,7 @@ The current code contains placeholder public keys in `src/kernel/chainparams.cpp
 
 1. **Generate five key pairs.** Each of the five authorized block producers must generate a fresh key pair on a secure, isolated machine. The private key must be stored securely (hardware wallet, encrypted storage). The compressed public key (33 bytes, 66 hex characters) is the only value that needs to leave the secure environment.
 
-2. **Replace placeholders in chainparams.cpp.** Each of the five `PLACEHOLDER_PUBKEY_N_33_BYTES_HEX_66_CHARS_HERE_000000000N` strings in the `signet_challenge_alpha` `ParseHex` call must be replaced with the actual 66-character hex encoding of the corresponding compressed public key. The format is:
+2. **Replace placeholders in chainparams.cpp.** Each of the five `PLACEHOLDER_PUBKEY_N_33_BYTES_HEX_66_CHARS_HERE_000000000N` strings in the `consensus.signet_challenge` `ParseHex` call (in `CAlphaMainParams`) must be replaced with the actual 66-character hex encoding of the corresponding compressed public key. The format is:
    ```
    "21" "<66 hex chars of compressed pubkey>"
    ```
@@ -1071,9 +1160,9 @@ The three-way coordination between zero subsidy, difficulty reset, and signet au
 
 ### Open Issues
 
-1. **CRITICAL: Placeholder pubkeys must be replaced.** The `signet_challenge_alpha` in `CAlphaMainParams` uses non-EC-point placeholder byte strings. Deployment with these keys will make all post-fork blocks unverifiable and stall the chain. The five authorized compressed pubkeys must be substituted before any mainnet release.
+1. **CRITICAL: Placeholder pubkeys must be replaced.** The `consensus.signet_challenge` in `CAlphaMainParams` uses non-EC-point placeholder byte strings. Deployment with these keys will make all post-fork blocks unverifiable and stall the chain. The five authorized compressed pubkeys must be substituted before any mainnet release.
 
-2. **SIGNET_HEADER duplication.** The constant `{0xec, 0xc7, 0xda, 0xa2}` is defined independently in `signet.cpp` (line 26, as a file-scope `static constexpr`) and again in `miner.cpp` (line 239, as a function-local `static constexpr`). If the header bytes are ever modified in one place but not the other, produced blocks will fail validation. This constant should be moved to `signet.h` as a shared exported constant.
+2. **~~SIGNET_HEADER duplication~~ FIXED.** The constant `{0xec, 0xc7, 0xda, 0xa2}` is now defined once in `signet.h` as `inline constexpr uint8_t SIGNET_HEADER[4]` and shared by both `signet.cpp` and `miner.cpp`. The previous duplicate `static constexpr` definition in `miner.cpp` has been removed.
 
 3. **`-server` as template-mode proxy.** The startup key check uses `-server` to identify template-serving mode. Nodes running with `-server` but without `-signetblockkey` will start normally post-fork but will be unable to produce block templates (RPC callers will receive an error). Operators who want to mine should configure `-signetblockkey`.
 
@@ -1089,20 +1178,20 @@ The three-way coordination between zero subsidy, difficulty reset, and signet au
 
 | File | Changes | Purpose |
 |------|---------|---------|
-| `src/consensus/params.h` | Added 2 new fields to `struct Params` | Fork activation height, challenge script |
+| `src/consensus/params.h` | Added 1 new field (`nSignetActivationHeight`) to `struct Params` | Fork activation height; challenge stored in existing `signet_challenge` field |
 | `src/kernel/chainparams.h` | Added `AlphaSignetForkOptions` struct, updated factory signatures | Configurable fork params for testnet/regtest |
-| `src/kernel/chainparams.cpp` | Added `BuildSignetChallenge`, updated constructors + factories | Configure fork parameters per chain; CLI-driven on test chains |
+| `src/kernel/chainparams.cpp` | Added `BuildSignetChallenge`, updated constructors to use `signet_challenge` | Configure fork parameters per chain; CLI-driven on test chains |
 | `src/chainparams.cpp` | Added `ReadAlphaSignetForkArgs`, updated `CreateChainParams` dispatch | Parse `-signetforkheight`/`-signetforkpubkeys` CLI args |
 | `src/chainparamsbase.cpp` | Registered `-signetforkheight` and `-signetforkpubkeys` | CLI arg registration |
-| `src/signet.h` | Added height-aware function + `ExtractPubkeysFromChallenge` | Shared pubkey extraction helper |
-| `src/signet.cpp` | Explicit SIGNET_HEADER check + `ExtractPubkeysFromChallenge` impl | Height-gated signet verification with explicit header rejection |
+| `src/signet.h` | Exported `SIGNET_HEADER` constant; added height-aware overload + `ExtractPubkeysFromChallenge` | Single source for SIGNET_HEADER; shared pubkey extraction helper |
+| `src/signet.cpp` | Added `VerifySignetChallenge` static helper; removed local SIGNET_HEADER; uses `signet_challenge` | Deduplicated verification kernel; height-gated signet check with explicit header rejection |
 | `src/validation.cpp` | 4 edits: zero subsidy, timebomb removal, 2 signet checks | Core consensus enforcement |
 | `src/pow.cpp` | 1 edit: difficulty reset at fork height | Prevent chain stall at fork |
 | `src/node/miner.h` | Added global key declaration | `extern CKey g_alpha_signet_key` |
-| `src/node/miner.cpp` | Added key definition + template signing logic | Embed BIP325 signet solution in block templates |
-| `src/init.cpp` | Startup logging, CLI warning, refactored key validation | Log fork params, warn on mainnet CLI args, use shared helper |
-| `src/rpc/mining.cpp` | Added informational RPC fields | Expose challenge + active flag in `getblocktemplate` |
+| `src/node/miner.cpp` | Added key definition + template signing logic; uses `signet_challenge`; removed local SIGNET_HEADER | Embed BIP325 signet solution in block templates |
+| `src/init.cpp` | Startup logging, CLI warning, refactored key validation using `signet_challenge` | Log fork params, warn on mainnet CLI args, use shared helper |
+| `src/rpc/mining.cpp` | Added informational RPC fields using `signet_challenge` | Expose challenge + active flag in `getblocktemplate` |
 
 ---
 
-*Document updated: 2026-02-18. All code modifications are marked with `// !ALPHA SIGNET FORK` and `// !ALPHA SIGNET FORK END` comment delimiters.*
+*Document updated: 2026-02-19. All code modifications are marked with `// !ALPHA SIGNET FORK` and `// !ALPHA SIGNET FORK END` comment delimiters.*

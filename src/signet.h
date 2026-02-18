@@ -10,7 +10,12 @@
 #include <primitives/transaction.h>
 #include <pubkey.h>
 
+#include <array>
+#include <cstdint>
 #include <optional>
+
+/** Four-byte magic header used to locate the signet commitment in the coinbase witness commitment. */
+inline constexpr uint8_t SIGNET_HEADER[4] = {0xec, 0xc7, 0xda, 0xa2};
 
 /**
  * Extract signature and check whether a block has a valid solution
@@ -20,7 +25,7 @@ bool CheckSignetBlockSolution(const CBlock& block, const Consensus::Params& cons
 // !ALPHA SIGNET FORK
 /**
  * Height-gated variant: check signet block solution only if height >= activation height.
- * Uses signet_challenge_alpha (not signet_challenge) from consensus params.
+ * Uses consensus.signet_challenge (safe because signet_blocks=false on Alpha chains).
  */
 bool CheckSignetBlockSolution(const CBlock& block, const Consensus::Params& consensusParams, int nHeight);
 

@@ -182,7 +182,8 @@ struct Params {
 
     // !ALPHA SIGNET FORK
     int nSignetActivationHeight{0};              // Height at which signet authorization activates (0 = never)
-    std::vector<uint8_t> signet_challenge_alpha;  // Challenge script for height-gated signet (separate from signet_challenge)
+    // Challenge script stored in signet_challenge (safe because signet_blocks=false on Alpha chains,
+    // so native BIP325 code paths never read it)
     // !ALPHA SIGNET FORK END
 
     // !SCASH END

@@ -197,8 +197,8 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
         }
 
         const Consensus::Params& cparams = chainparams.GetConsensus();
-        const CScript challenge(cparams.signet_challenge_alpha.begin(),
-                               cparams.signet_challenge_alpha.end());
+        const CScript challenge(cparams.signet_challenge.begin(),
+                               cparams.signet_challenge.end());
 
         // Create the signet signing transaction pair
         const std::optional<SignetTxs> signet_txs = SignetTxs::Create(*pblock, challenge);
@@ -234,7 +234,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
         writer << tx_signing.vin[0].scriptWitness.stack;
 
         // Append SIGNET_HEADER + solution to witness commitment output
-        static constexpr uint8_t SIGNET_HEADER[4] = {0xec, 0xc7, 0xda, 0xa2};
+        // SIGNET_HEADER is defined in signet.h
         int commitpos = GetWitnessCommitmentIndex(*pblock);
         if (commitpos == NO_WITNESS_COMMITMENT) {
             throw std::runtime_error(strprintf(

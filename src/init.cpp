@@ -1231,10 +1231,10 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
     // !ALPHA SIGNET FORK - Log fork parameters
     if (g_isAlpha) {
         const Consensus::Params& fp = chainparams.GetConsensus();
-        if (fp.nSignetActivationHeight > 0 && !fp.signet_challenge_alpha.empty()) {
+        if (fp.nSignetActivationHeight > 0 && !fp.signet_challenge.empty()) {
             LogPrintf("Alpha signet fork: activation height = %d\n", fp.nSignetActivationHeight);
-            LogPrintf("Alpha signet fork: challenge script = %s\n", HexStr(fp.signet_challenge_alpha));
-            std::vector<CPubKey> pubkeys = ExtractPubkeysFromChallenge(fp.signet_challenge_alpha);
+            LogPrintf("Alpha signet fork: challenge script = %s\n", HexStr(fp.signet_challenge));
+            std::vector<CPubKey> pubkeys = ExtractPubkeysFromChallenge(fp.signet_challenge);
             LogPrintf("Alpha signet fork: %d authorized pubkey(s):\n", pubkeys.size());
             for (size_t i = 0; i < pubkeys.size(); ++i) {
                 LogPrintf("  pubkey[%d]: %s\n", i, HexStr(pubkeys[i]));
@@ -1850,7 +1850,7 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
                 }
 
                 // Extract authorized pubkeys from the challenge script using shared helper
-                std::vector<CPubKey> authorizedPubkeys = ExtractPubkeysFromChallenge(forkParams.signet_challenge_alpha);
+                std::vector<CPubKey> authorizedPubkeys = ExtractPubkeysFromChallenge(forkParams.signet_challenge);
                 bool keyAuthorized = false;
                 for (const auto& candidateKey : authorizedPubkeys) {
                     if (candidateKey == signingPubKey) {

@@ -90,11 +90,10 @@ class CAlphaMainParams : public CChainParams {
 public:
     CAlphaMainParams() {
         m_chain_type = ChainType::ALPHAMAIN;
-        consensus.signet_blocks = false;
-        consensus.signet_challenge.clear();
+        consensus.signet_blocks = false;  // IMPORTANT: keeps native BIP325 paths from reading signet_challenge
         consensus.nSubsidyHalvingInterval = 210000*5;  // keep the same halving time as BTC (5x the number of blocks)
-        
-        
+
+
        
         consensus.BIP34Height = 70228;
         consensus.BIP34Hash = uint256();
@@ -166,7 +165,7 @@ public:
 
         // 1-of-5 bare multisig challenge: OP_1 <pk1> <pk2> <pk3> <pk4> <pk5> OP_5 OP_CHECKMULTISIG
         // Replace placeholder pubkeys with actual 33-byte compressed pubkeys before deployment
-        consensus.signet_challenge_alpha = ParseHex(
+        consensus.signet_challenge = ParseHex(
             "51"                                                              // OP_1
             "21" "PLACEHOLDER_PUBKEY_1_33_BYTES_HEX_66_CHARS_HERE_0000000001"  // push 33 bytes + pubkey 1
             "21" "PLACEHOLDER_PUBKEY_2_33_BYTES_HEX_66_CHARS_HERE_0000000002"  // push 33 bytes + pubkey 2
@@ -248,8 +247,7 @@ class CAlphaTestNetParams : public CChainParams {
 public:
     explicit CAlphaTestNetParams(const AlphaSignetForkOptions& fork_opts) {
         m_chain_type = ChainType::ALPHATESTNET;
-        consensus.signet_blocks = false;
-        consensus.signet_challenge.clear();
+        consensus.signet_blocks = false;  // IMPORTANT: keeps native BIP325 paths from reading signet_challenge
         consensus.nSubsidyHalvingInterval = 210000*5;
         consensus.BIP34Height = 1; // Always active
         consensus.BIP34Hash = uint256();
@@ -296,10 +294,10 @@ public:
         // !ALPHA SIGNET FORK
         if (fork_opts.fork_height && *fork_opts.fork_height > 0 && fork_opts.pubkeys_hex) {
             consensus.nSignetActivationHeight = *fork_opts.fork_height;
-            consensus.signet_challenge_alpha = BuildSignetChallenge(*fork_opts.pubkeys_hex);
+            consensus.signet_challenge = BuildSignetChallenge(*fork_opts.pubkeys_hex);
         } else {
             consensus.nSignetActivationHeight = 0;
-            consensus.signet_challenge_alpha.clear();
+            consensus.signet_challenge.clear();
         }
         // !ALPHA SIGNET FORK END
 
@@ -359,8 +357,7 @@ public:
     explicit CAlphaRegTestParams(const RegTestOptions& opts, const AlphaSignetForkOptions& fork_opts)
     {
         m_chain_type = ChainType::ALPHAREGTEST;
-        consensus.signet_blocks = false;
-        consensus.signet_challenge.clear();
+        consensus.signet_blocks = false;  // IMPORTANT: keeps native BIP325 paths from reading signet_challenge
         consensus.nSubsidyHalvingInterval = 2000;
         consensus.BIP34Height = 10;
         consensus.BIP34Hash = uint256();
@@ -414,10 +411,10 @@ public:
         // !ALPHA SIGNET FORK
         if (fork_opts.fork_height && *fork_opts.fork_height > 0 && fork_opts.pubkeys_hex) {
             consensus.nSignetActivationHeight = *fork_opts.fork_height;
-            consensus.signet_challenge_alpha = BuildSignetChallenge(*fork_opts.pubkeys_hex);
+            consensus.signet_challenge = BuildSignetChallenge(*fork_opts.pubkeys_hex);
         } else {
             consensus.nSignetActivationHeight = 0;
-            consensus.signet_challenge_alpha.clear();
+            consensus.signet_challenge.clear();
         }
         // !ALPHA SIGNET FORK END
 

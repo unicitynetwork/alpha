@@ -985,7 +985,7 @@ static RPCHelpMan getblocktemplate()
     // !ALPHA SIGNET FORK
     if (g_isAlpha && consensusParams.nSignetActivationHeight > 0 &&
         (pindexPrev->nHeight + 1) >= consensusParams.nSignetActivationHeight) {
-        result.pushKV("alpha_signet_challenge", HexStr(consensusParams.signet_challenge_alpha));
+        result.pushKV("alpha_signet_challenge", HexStr(consensusParams.signet_challenge));
         result.pushKV("alpha_signet_active", true);
     }
     // !ALPHA SIGNET FORK END
