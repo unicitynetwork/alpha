@@ -262,7 +262,7 @@ The two-parameter distinction is critical: calling the wrong overload would eith
   5. Deserializes those bytes as a `scriptSig` and witness stack into the "to_sign" spending transaction.
   6. Computes a modified Merkle root using the coinbase without the signet solution, and commits that root into the "to_spend" output's scriptSig.
   
-  If any step fails (no witness commitment, extraneous data after the solution, deserialization error), `SignetTxs::Create` returns `std::nullopt` and the function returns `false`. Note: if there is no `SIGNET_HEADER` in the commitment at all, `SignetTxs::Create` does not fail -- it simply leaves `scriptSig` empty and `witness` empty, which will be the case for `OP_TRUE` challenges (testnet/regtest) where no signature is required and the empty solution trivially satisfies the challenge.
+  If any step fails (no witness commitment, extraneous data after the solution, deserialization error), `SignetTxs::Create` returns `std::nullopt` and the function returns `false`. Note: `SignetTxs::Create` itself does not require `SIGNET_HEADER` to be present — but this is now irrelevant because the explicit `SIGNET_HEADER` check added before the `SignetTxs::Create` call rejects any block missing the header before it reaches this point. All post-fork blocks on all chain types must contain the `SIGNET_HEADER` in the coinbase witness commitment.
 
 - **`VerifyScript` call** -- Runs the Script interpreter against the extracted `scriptSig` and witness using `BLOCK_SCRIPT_VERIFY_FLAGS`. These flags (defined at the top of `signet.cpp` as `SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_WITNESS | SCRIPT_VERIFY_DERSIG | SCRIPT_VERIFY_NULLDUMMY`) are the same flags used by the original `CheckSignetBlockSolution`. For the 1-of-5 bare multisig, the interpreter evaluates the `scriptSig` (which contains the signature) against the `scriptPubKey` (which is the challenge). The `SCRIPT_VERIFY_NULLDUMMY` flag enforces the BIP147 rule that the mandatory dummy element in `OP_CHECKMULTISIG` must be an empty byte vector.
 
@@ -983,18 +983,18 @@ The following unit tests should be written (if not already present):
 
 3. **`CheckSignetBlockSolution` height gate test:** Verify that the three-argument overload returns `true` for blocks below the activation height without examining the block contents (using a block with no witness commitment as input).
 
-4. **`CreateNewBlock` signing test:** On regtest with `OP_TRUE` challenge, verify that block templates at height >= 200 contain `SIGNET_HEADER` in the coinbase witness commitment output.
+4. **`CreateNewBlock` signing test:** On regtest with `-signetforkheight` and `-signetforkpubkeys` configured, verify that block templates at post-fork heights contain `SIGNET_HEADER` in the coinbase witness commitment output.
 
 ### Functional test considerations
 
 A Python functional test in `test/functional/` should:
 
-1. Start a regtest node.
-2. Mine 199 blocks and verify subsidy is nonzero.
-3. Mine block 200 and verify subsidy is zero.
-4. Verify that block 200's coinbase contains the signet header (trivially satisfied by `OP_TRUE` on regtest).
-5. Verify that `getblocktemplate` returns `alpha_signet_active: true` after block 200.
-6. Optionally: configure a real signing key and challenge on regtest, verify that blocks are properly signed and that unsigned blocks are rejected.
+1. Start a regtest node with `-signetforkheight=10 -signetforkpubkeys=<hex> -signetblockkey=<WIF>`.
+2. Mine 9 blocks and verify subsidy is nonzero.
+3. Mine block 10 and verify subsidy is zero.
+4. Verify that block 10's coinbase contains the `SIGNET_HEADER` and a valid signature.
+5. Verify that `getblocktemplate` returns `alpha_signet_active: true` after block 10.
+6. Start a second regtest node with the same fork params but no `-signetblockkey`, verify that unsigned blocks are rejected with "missing SIGNET_HEADER".
 
 ---
 
