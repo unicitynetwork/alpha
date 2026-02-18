@@ -8,6 +8,7 @@
 #include <consensus/params.h>
 #include <primitives/block.h>
 #include <primitives/transaction.h>
+#include <pubkey.h>
 
 #include <optional>
 
@@ -22,6 +23,12 @@ bool CheckSignetBlockSolution(const CBlock& block, const Consensus::Params& cons
  * Uses signet_challenge_alpha (not signet_challenge) from consensus params.
  */
 bool CheckSignetBlockSolution(const CBlock& block, const Consensus::Params& consensusParams, int nHeight);
+
+/**
+ * Extract compressed pubkeys from a challenge script (e.g. bare multisig).
+ * Returns all valid 33-byte compressed pubkeys found as push data in the script.
+ */
+std::vector<CPubKey> ExtractPubkeysFromChallenge(const std::vector<uint8_t>& challenge);
 // !ALPHA SIGNET FORK END
 
 /**

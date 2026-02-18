@@ -40,6 +40,16 @@ void SetupChainParamsBaseOptions(ArgsManager& argsman)
     argsman.AddArg("-signet", "Use the signet chain. Equivalent to -chain=signet. Note that the network is defined by the -signetchallenge parameter", ArgsManager::ALLOW_ANY, OptionsCategory::CHAINPARAMS);
     argsman.AddArg("-signetchallenge", "Blocks must satisfy the given script to be considered valid (only for signet networks; defaults to the global default signet test network challenge)", ArgsManager::ALLOW_ANY | ArgsManager::DISALLOW_NEGATION, OptionsCategory::CHAINPARAMS);
     argsman.AddArg("-signetseednode", "Specify a seed node for the signet network, in the hostname[:port] format, e.g. sig.net:1234 (may be used multiple times to specify multiple seed nodes; defaults to the global default signet test network seed node(s))", ArgsManager::ALLOW_ANY | ArgsManager::DISALLOW_NEGATION, OptionsCategory::CHAINPARAMS);
+
+    // !ALPHA SIGNET FORK
+    argsman.AddArg("-signetforkheight=<n>",
+        "Activation height for signet-style fork (alphatestnet/alpharegtest only, default: 0 = disabled)",
+        ArgsManager::ALLOW_ANY, OptionsCategory::CHAINPARAMS);
+    argsman.AddArg("-signetforkpubkeys=<hex1>,<hex2>,...",
+        "Comma-separated compressed pubkeys for 1-of-N multisig challenge (alphatestnet/alpharegtest only). "
+        "Required when -signetforkheight > 0.",
+        ArgsManager::ALLOW_ANY, OptionsCategory::CHAINPARAMS);
+    // !ALPHA SIGNET FORK END
 }
 
 static std::unique_ptr<CBaseChainParams> globalChainBaseParams;

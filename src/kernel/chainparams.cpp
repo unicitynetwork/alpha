@@ -16,8 +16,10 @@
 #include <logging.h>
 #include <primitives/block.h>
 #include <primitives/transaction.h>
+#include <pubkey.h>
 #include <script/interpreter.h>
 #include <script/script.h>
+#include <script/solver.h>
 #include <uint256.h>
 #include <util/chaintype.h>
 #include <util/strencodings.h>
@@ -70,6 +72,18 @@ static CBlock CreateAlphaGenesisBlock(uint32_t nTime, uint32_t nNonce, uint32_t 
     return CreateGenesisBlock(pszTimestamp, genesisOutputScript, nTime, nNonce, nBits, nVersion, genesisReward);
 }
 
+
+// !ALPHA SIGNET FORK
+static std::vector<uint8_t> BuildSignetChallenge(const std::vector<std::string>& pubkeys_hex)
+{
+    std::vector<CPubKey> pubkeys;
+    for (const auto& hex : pubkeys_hex) {
+        pubkeys.emplace_back(ParseHex(hex));
+    }
+    CScript script = GetScriptForMultisig(1, pubkeys);
+    return std::vector<uint8_t>(script.begin(), script.end());
+}
+// !ALPHA SIGNET FORK END
 
 // ALPHA MainNet
 class CAlphaMainParams : public CChainParams {
@@ -232,7 +246,7 @@ public:
  */
 class CAlphaTestNetParams : public CChainParams {
 public:
-    CAlphaTestNetParams() {
+    explicit CAlphaTestNetParams(const AlphaSignetForkOptions& fork_opts) {
         m_chain_type = ChainType::ALPHATESTNET;
         consensus.signet_blocks = false;
         consensus.signet_challenge.clear();
@@ -280,8 +294,13 @@ public:
 */
 
         // !ALPHA SIGNET FORK
-        consensus.nSignetActivationHeight = 200;  // Low height for testing
-        consensus.signet_challenge_alpha = ParseHex("51");  // OP_TRUE (trivial challenge, no signature needed)
+        if (fork_opts.fork_height && *fork_opts.fork_height > 0 && fork_opts.pubkeys_hex) {
+            consensus.nSignetActivationHeight = *fork_opts.fork_height;
+            consensus.signet_challenge_alpha = BuildSignetChallenge(*fork_opts.pubkeys_hex);
+        } else {
+            consensus.nSignetActivationHeight = 0;
+            consensus.signet_challenge_alpha.clear();
+        }
         // !ALPHA SIGNET FORK END
 
         pchMessageStart[0] = 0x0d;
@@ -337,7 +356,7 @@ public:
 class CAlphaRegTestParams : public CChainParams
 {
 public:
-    explicit CAlphaRegTestParams(const RegTestOptions& opts)
+    explicit CAlphaRegTestParams(const RegTestOptions& opts, const AlphaSignetForkOptions& fork_opts)
     {
         m_chain_type = ChainType::ALPHAREGTEST;
         consensus.signet_blocks = false;
@@ -393,8 +412,13 @@ public:
 */
 
         // !ALPHA SIGNET FORK
-        consensus.nSignetActivationHeight = 200;  // Low height for testing
-        consensus.signet_challenge_alpha = ParseHex("51");  // OP_TRUE (trivial challenge, no signature needed)
+        if (fork_opts.fork_height && *fork_opts.fork_height > 0 && fork_opts.pubkeys_hex) {
+            consensus.nSignetActivationHeight = *fork_opts.fork_height;
+            consensus.signet_challenge_alpha = BuildSignetChallenge(*fork_opts.pubkeys_hex);
+        } else {
+            consensus.nSignetActivationHeight = 0;
+            consensus.signet_challenge_alpha.clear();
+        }
         // !ALPHA SIGNET FORK END
 
         consensus.fPowRandomX = true;
@@ -479,14 +503,14 @@ public:
     }
 };
 
-std::unique_ptr<const CChainParams> CChainParams::AlphaRegTest(const RegTestOptions& options)
+std::unique_ptr<const CChainParams> CChainParams::AlphaRegTest(const RegTestOptions& options, const AlphaSignetForkOptions& fork_options)
 {
-    return std::make_unique<const CAlphaRegTestParams>(options);
+    return std::make_unique<const CAlphaRegTestParams>(options, fork_options);
 }
 
-std::unique_ptr<const CChainParams> CChainParams::AlphaTestNet()
+std::unique_ptr<const CChainParams> CChainParams::AlphaTestNet(const AlphaSignetForkOptions& fork_options)
 {
-    return std::make_unique<const CAlphaTestNetParams>();
+    return std::make_unique<const CAlphaTestNetParams>(fork_options);
 }
 
 std::unique_ptr<const CChainParams> CChainParams::AlphaMain()

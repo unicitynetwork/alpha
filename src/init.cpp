@@ -99,6 +99,7 @@
 #include <key.h>
 #include <key_io.h>
 #include <script/script.h>
+#include <signet.h>
 // !ALPHA SIGNET FORK END
 
 #include <algorithm>
@@ -1225,7 +1226,29 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
         g_isAlpha = true;
         LogPrintf("%s: Alpha active\n", __func__);
     }
-    // !ALPHA END 
+    // !ALPHA END
+
+    // !ALPHA SIGNET FORK - Log fork parameters
+    if (g_isAlpha) {
+        const Consensus::Params& fp = chainparams.GetConsensus();
+        if (fp.nSignetActivationHeight > 0 && !fp.signet_challenge_alpha.empty()) {
+            LogPrintf("Alpha signet fork: activation height = %d\n", fp.nSignetActivationHeight);
+            LogPrintf("Alpha signet fork: challenge script = %s\n", HexStr(fp.signet_challenge_alpha));
+            std::vector<CPubKey> pubkeys = ExtractPubkeysFromChallenge(fp.signet_challenge_alpha);
+            LogPrintf("Alpha signet fork: %d authorized pubkey(s):\n", pubkeys.size());
+            for (size_t i = 0; i < pubkeys.size(); ++i) {
+                LogPrintf("  pubkey[%d]: %s\n", i, HexStr(pubkeys[i]));
+            }
+        } else {
+            LogPrintf("Alpha signet fork: disabled (height=%d)\n", fp.nSignetActivationHeight);
+        }
+        if (chainparams.GetChainType() == ChainType::ALPHAMAIN) {
+            if (args.IsArgSet("-signetforkheight") || args.IsArgSet("-signetforkpubkeys")) {
+                LogPrintf("WARNING: -signetforkheight/-signetforkpubkeys ignored on mainnet.\n");
+            }
+        }
+    }
+    // !ALPHA SIGNET FORK END
 
     assert(!(g_isAlpha && !g_isRandomX) && "g_isAlpha cannot be true if g_isRandomX is false");
 
@@ -1826,21 +1849,13 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
                     return InitError(_("Invalid -signetblockkey: public key derivation failed."));
                 }
 
-                // Extract authorized pubkeys from the challenge script
-                const std::vector<uint8_t>& challenge = forkParams.signet_challenge_alpha;
+                // Extract authorized pubkeys from the challenge script using shared helper
+                std::vector<CPubKey> authorizedPubkeys = ExtractPubkeysFromChallenge(forkParams.signet_challenge_alpha);
                 bool keyAuthorized = false;
-                CScript challengeScript(challenge.begin(), challenge.end());
-                opcodetype opcode;
-                std::vector<uint8_t> pushdata;
-                CScript::const_iterator pc = challengeScript.begin();
-
-                while (challengeScript.GetOp(pc, opcode, pushdata)) {
-                    if (pushdata.size() == CPubKey::COMPRESSED_SIZE) {
-                        CPubKey candidateKey(pushdata);
-                        if (candidateKey.IsFullyValid() && candidateKey == signingPubKey) {
-                            keyAuthorized = true;
-                            break;
-                        }
+                for (const auto& candidateKey : authorizedPubkeys) {
+                    if (candidateKey == signingPubKey) {
+                        keyAuthorized = true;
+                        break;
                     }
                 }
 
@@ -1848,7 +1863,7 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
                     return InitError(strprintf(
                         _("Configured -signetblockkey public key (%s) is NOT in the authorized allowlist. "
                           "The key must correspond to one of the %d authorized pubkeys in the fork challenge script."),
-                        HexStr(signingPubKey), 5));
+                        HexStr(signingPubKey), authorizedPubkeys.size()));
                 }
 
                 // Store the validated key globally

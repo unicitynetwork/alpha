@@ -149,28 +149,19 @@ The three changes interact in a specific order within the validation pipeline. D
 
   The choice of bare multisig (rather than P2SH or P2WSH wrapping) is consistent with the Bitcoin signet design, where the challenge is placed directly as the scriptPubKey of the `m_to_spend` output in the synthetic signing transaction pair. Bare multisig scripts can be verified by `VerifyScript` without any additional wrapping.
 
-#### Testnet (CTestNetParams) changes
+#### Testnet / Regtest (CAlphaTestNetParams / CAlphaRegTestParams) changes
 
-```diff
-+        // !ALPHA SIGNET FORK
-+        consensus.nSignetActivationHeight = 200;  // Low height for testing
-+        consensus.signet_challenge_alpha = ParseHex("51");  // OP_TRUE (trivial challenge, no signature needed)
-+        // !ALPHA SIGNET FORK END
+The testnet and regtest constructors now accept `AlphaSignetForkOptions` alongside the existing `RegTestOptions`. The signet fork is **disabled by default** (height=0, empty challenge) unless the operator provides CLI args:
+
+```
+-signetforkheight=<n> -signetforkpubkeys=<hex1>,<hex2>,...
 ```
 
-- `nSignetActivationHeight = 200` -- A low height that can be reached quickly in a test environment.
-- `signet_challenge_alpha = ParseHex("51")` -- `0x51` is `OP_1`, which evaluates to true with any witness. In Script execution this behaves as an always-passing challenge, so no signing key is required on testnet. This allows any node to produce post-fork blocks on testnet without a configured key.
+When provided, `BuildSignetChallenge()` constructs a 1-of-N bare multisig from the supplied compressed pubkeys. This replaces the previous hardcoded `OP_TRUE` challenge, which allowed any block to pass post-fork validation -- making it impossible to test the actual signing/verification flow.
 
-#### Regtest (CRegTestParams) changes
+The `BuildSignetChallenge` helper (file-scope static in `kernel/chainparams.cpp`) uses `GetScriptForMultisig(1, pubkeys)` to produce the same script format as mainnet.
 
-```diff
-+        // !ALPHA SIGNET FORK
-+        consensus.nSignetActivationHeight = 200;  // Low height for testing
-+        consensus.signet_challenge_alpha = ParseHex("51");  // OP_TRUE (trivial challenge, no signature needed)
-+        // !ALPHA SIGNET FORK END
-```
-
-Identical to testnet for the same reasons. Regtest at height 200 will enforce zero subsidy and the trivial `OP_1` signet check.
+After initialization, the exact same `CheckSignetBlockSolution` code path runs for all chain types.
 
 **Cross-references:**
 - The `nSignetActivationHeight` value is read by `validation.cpp`, `pow.cpp`, `signet.cpp`, `node/miner.cpp`, `rpc/mining.cpp`, and `init.cpp`.
@@ -256,6 +247,12 @@ The two-parameter distinction is critical: calling the wrong overload would eith
 **Line-by-line explanation:**
 
 - **Height guard** (`nSignetActivationHeight <= 0 || nHeight < nSignetActivationHeight`) -- Returns `true` immediately for any block before the fork height. This is the single gate that makes the entire mechanism height-conditional. On chains where `nSignetActivationHeight` is zero (all non-Alpha chains), this always short-circuits.
+
+- **Empty challenge guard** -- If `signet_challenge_alpha` is empty (fork disabled or not configured), returns `false` with a log message. This prevents silent pass-through.
+
+- **Explicit SIGNET_HEADER check** -- Before calling `SignetTxs::Create`, the function now independently verifies that the coinbase witness commitment contains the `SIGNET_HEADER` magic bytes (`{0xec, 0xc7, 0xda, 0xa2}`). This closes the fragile implicit rejection path: previously, blocks missing the header relied on `VerifyScript` failing against a real multisig challenge (empty scriptSig fails multisig). The explicit check uses `FetchAndClearCommitmentSection` on a copy of the commitment script and rejects immediately if the header is absent, with a "missing SIGNET_HEADER" log message.
+
+- **`ExtractPubkeysFromChallenge`** -- New shared helper function (declared in `signet.h`, implemented in `signet.cpp`) that extracts all valid 33-byte compressed pubkeys from a challenge script by iterating its opcodes. Used by both `init.cpp` (startup key validation, startup logging) to avoid code duplication.
 
 - **`SignetTxs::Create(block, challenge)`** -- Calls the existing BIP325 transaction pair factory. This function:
   1. Creates a synthetic "to_spend" transaction with a single output whose `scriptPubKey` is the challenge script.
@@ -775,18 +772,28 @@ main() -> AppInit()
 AppInitMain()
     |
     +-- Load chainparams (consensus.nSignetActivationHeight = 450000, etc.)
+    +-- g_isAlpha = true
+    |
+    v
+    [ALPHA SIGNET FORK startup logging]
+    |
+    +-- Log fork height + challenge script + authorized pubkeys
+    |   (uses ExtractPubkeysFromChallenge shared helper)
+    +-- If mainnet + CLI args set: log WARNING that they are ignored
+    |
     +-- Load block index
     +-- chain_active_height = chainman.ActiveChain().Height()
     |
     v
-    [ALPHA SIGNET FORK startup validation]
+    [ALPHA SIGNET FORK key validation]
     |
     +-- if not g_isAlpha: skip
     +-- if not -server: skip (non-template nodes don't need a key)
     +-- if chain_active_height < nSignetActivationHeight: skip (fork not active)
-    +-- if chain_active_height >= 450000:
+    +-- if chain_active_height >= activation height:
     |     if no -signetblockkey: log WARNING, continue (node runs as non-mining full node)
-    |     if -signetblockkey provided: validate and load
+    |     if -signetblockkey provided: validate key against challenge
+    |       (uses ExtractPubkeysFromChallenge, dynamic pubkey count in error msg)
     |
     v
     [if key validated]
@@ -800,6 +807,28 @@ AppInitMain()
 ---
 
 ## Configuration Guide
+
+### The `-signetforkheight` and `-signetforkpubkeys` Parameters (testnet/regtest only)
+
+These two parameters configure the signet fork on `alphatestnet` and `alpharegtest` chains. They are ignored on `alpha` (mainnet), which uses hardcoded values.
+
+- `-signetforkheight=<n>` -- Activation height for the signet-style fork. Default: `0` (disabled). Must be a non-negative integer. When set to `> 0`, `-signetforkpubkeys` is required.
+
+- `-signetforkpubkeys=<hex1>,<hex2>,...` -- Comma-separated list of compressed secp256k1 public keys (33 bytes each, 66 hex characters). These are combined into a 1-of-N bare multisig challenge script using `GetScriptForMultisig(1, pubkeys)`. Required when `-signetforkheight > 0`.
+
+**Cross-validation:** The two parameters are validated together:
+- If `-signetforkheight > 0` is set without `-signetforkpubkeys`, startup fails.
+- If `-signetforkpubkeys` is set without `-signetforkheight > 0`, startup fails.
+- Each pubkey is validated as a 33-byte hex string and a valid secp256k1 point.
+
+**Example:**
+```bash
+alphad -chain=alpharegtest \
+  -signetforkheight=10 \
+  -signetforkpubkeys=02a1b2c3...,03d4e5f6... \
+  -signetblockkey=KwDi... \
+  -server
+```
 
 ### The `-signetblockkey` Parameter
 
@@ -889,60 +918,60 @@ The current code contains placeholder public keys in `src/kernel/chainparams.cpp
 
 ## Testing Strategy
 
-### Regtest testing
+### Regtest testing (CLI-based)
 
-Regtest is the primary environment for testing the fork behavior. The regtest configuration sets `nSignetActivationHeight = 200` with an `OP_TRUE` challenge, so the fork activates at block 200 and no signing key is required.
+Regtest fork parameters are now configured via CLI flags instead of hardcoded values. By default, the fork is **disabled** on regtest (height=0).
 
-**Test zero subsidy:**
+**Enable fork on regtest with real keys:**
 ```bash
-# Start regtest node
+# Generate a test key pair first
 alphad -chain=alpharegtest -server -rpcuser=test -rpcpassword=test -daemon
+ADDR=$(alpha-cli -chain=alpharegtest getnewaddress)
+WIF=$(alpha-cli -chain=alpharegtest dumpprivkey $ADDR)
+PUBKEY=$(alpha-cli -chain=alpharegtest getaddressinfo $ADDR | jq -r '.pubkey')
+alpha-cli -chain=alpharegtest stop
 
-# Mine 200 blocks (pre-fork, should have normal subsidy)
-alpha-cli -chain=alpharegtest generatetoaddress 200 <address>
+# Start with fork enabled at height 10
+alphad -chain=alpharegtest \
+  -signetforkheight=10 \
+  -signetforkpubkeys=$PUBKEY \
+  -signetblockkey=$WIF \
+  -server -rpcuser=test -rpcpassword=test -daemon
 
-# Check block 199 coinbase
-alpha-cli -chain=alpharegtest getblock $(alpha-cli -chain=alpharegtest getblockhash 199) 2 | \
-  jq '.tx[0].vout[0].value'
-# Expected: 5.0 (post-400000-halving rate, but regtest starts at block 0 so this depends on test setup)
+# Confirm startup logs show fork height=10 and the pubkey
+# Mine 9 blocks (pre-fork) — normal subsidy
+alpha-cli -chain=alpharegtest generatetoaddress 9 $ADDR
 
-# Mine block 200 (first fork block)
-alpha-cli -chain=alpharegtest generatetoaddress 1 <address>
+# Mine block 10 — zero subsidy, signed template
+alpha-cli -chain=alpharegtest generatetoaddress 1 $ADDR
 
-# Check block 200 coinbase value (should be 0 subsidy, fees only)
-alpha-cli -chain=alpharegtest getblock $(alpha-cli -chain=alpharegtest getblockhash 200) 2 | \
-  jq '.tx[0].vout[0].value'
-# Expected: 0.0 (no transactions in the block = no fees)
-```
-
-**Test getblocktemplate response:**
-```bash
+# Confirm getblocktemplate returns alpha_signet_active: true
 alpha-cli -chain=alpharegtest getblocktemplate '{"rules": ["segwit"]}'
-# After block 200, should include:
-# "alpha_signet_active": true
-# "alpha_signet_challenge": "51"  (OP_TRUE for regtest)
 ```
 
-**Test that unauthorized blocks are rejected:**
+**Regtest without fork (default):**
 ```bash
-# Craft a block at height 201 without a valid signet solution
-# (On mainnet this would be a block produced without -signetblockkey)
-# The OP_TRUE challenge means all blocks pass on regtest, so to test
-# rejection, temporarily modify the challenge to a real multisig
-# and attempt to submit a block without a solution.
+alphad -chain=alpharegtest -server -rpcuser=test -rpcpassword=test -daemon
+# Confirm log says "Alpha signet fork: disabled"
+# Mine blocks normally — no fork behavior
 ```
 
-**Test difficulty reset:**
+**Test that unsigned blocks are rejected:**
 ```bash
-alpha-cli -chain=alpharegtest getblocktemplate '{"rules": ["segwit"]}' | jq '.bits'
-# At height 200 and immediately after, should be the regtest powLimit
+# Start a second regtest node with fork enabled but NO -signetblockkey
+# Attempt to mine post-fork — should fail with missing SIGNET_HEADER
 ```
 
 ### Testnet testing
 
-The Alpha testnet (`alphatestnet`) has the same configuration as regtest for fork parameters: height 200, `OP_TRUE` challenge. This allows testnet operators to observe the fork transition on a live network without needing authorized keys.
-
-For testing the full signing flow on testnet, a separate testnet could be configured with a real 1-of-5 challenge and known test keys.
+Testnet fork parameters are also configured via CLI. To test the full signing flow:
+```bash
+alphad -chain=alphatestnet \
+  -signetforkheight=100 \
+  -signetforkpubkeys=$PUBKEY1,$PUBKEY2 \
+  -signetblockkey=$WIF_FOR_PUBKEY1 \
+  -server
+```
 
 ### Unit test considerations
 
@@ -1048,7 +1077,7 @@ The three-way coordination between zero subsidy, difficulty reset, and signet au
 
 3. **`-server` as template-mode proxy.** The startup key check uses `-server` to identify template-serving mode. Nodes running with `-server` but without `-signetblockkey` will start normally post-fork but will be unable to produce block templates (RPC callers will receive an error). Operators who want to mine should configure `-signetblockkey`.
 
-4. **Hardcoded "5" in error message** at `init.cpp` line 1859 should be derived from parsing the challenge script rather than hardcoded.
+4. **~~Hardcoded "5" in error message~~ FIXED.** `init.cpp` now uses `ExtractPubkeysFromChallenge()` to derive the count dynamically from the challenge script.
 
 5. **No unit tests for the new consensus rules.** The existing test framework (functional tests and unit tests inherited from Bitcoin Core) does not include tests specific to the `nSignetActivationHeight` path. Test coverage for: (a) zero-subsidy at exactly height 450000 vs 449999; (b) difficulty reset at the boundary; (c) signet check accept/reject at the boundary; should be added before deployment.
 
@@ -1061,16 +1090,19 @@ The three-way coordination between zero subsidy, difficulty reset, and signet au
 | File | Changes | Purpose |
 |------|---------|---------|
 | `src/consensus/params.h` | Added 2 new fields to `struct Params` | Fork activation height, challenge script |
-| `src/kernel/chainparams.cpp` | Added fork params for mainnet/testnet/regtest | Configure fork parameters per chain |
-| `src/signet.h` | Added height-aware function declaration | `CheckSignetBlockSolution` overload with height parameter |
-| `src/signet.cpp` | Implemented height-aware overload | Height-gated signet verification using `signet_challenge_alpha` |
+| `src/kernel/chainparams.h` | Added `AlphaSignetForkOptions` struct, updated factory signatures | Configurable fork params for testnet/regtest |
+| `src/kernel/chainparams.cpp` | Added `BuildSignetChallenge`, updated constructors + factories | Configure fork parameters per chain; CLI-driven on test chains |
+| `src/chainparams.cpp` | Added `ReadAlphaSignetForkArgs`, updated `CreateChainParams` dispatch | Parse `-signetforkheight`/`-signetforkpubkeys` CLI args |
+| `src/chainparamsbase.cpp` | Registered `-signetforkheight` and `-signetforkpubkeys` | CLI arg registration |
+| `src/signet.h` | Added height-aware function + `ExtractPubkeysFromChallenge` | Shared pubkey extraction helper |
+| `src/signet.cpp` | Explicit SIGNET_HEADER check + `ExtractPubkeysFromChallenge` impl | Height-gated signet verification with explicit header rejection |
 | `src/validation.cpp` | 4 edits: zero subsidy, timebomb removal, 2 signet checks | Core consensus enforcement |
 | `src/pow.cpp` | 1 edit: difficulty reset at fork height | Prevent chain stall at fork |
 | `src/node/miner.h` | Added global key declaration | `extern CKey g_alpha_signet_key` |
 | `src/node/miner.cpp` | Added key definition + template signing logic | Embed BIP325 signet solution in block templates |
-| `src/init.cpp` | Added arg registration + startup key validation | `-signetblockkey` parameter with allowlist check |
+| `src/init.cpp` | Startup logging, CLI warning, refactored key validation | Log fork params, warn on mainnet CLI args, use shared helper |
 | `src/rpc/mining.cpp` | Added informational RPC fields | Expose challenge + active flag in `getblocktemplate` |
 
 ---
 
-*Document generated: 2026-02-18. All code modifications are marked with `// !ALPHA SIGNET FORK` and `// !ALPHA SIGNET FORK END` comment delimiters.*
+*Document updated: 2026-02-18. All code modifications are marked with `// !ALPHA SIGNET FORK` and `// !ALPHA SIGNET FORK END` comment delimiters.*

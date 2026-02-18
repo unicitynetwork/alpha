@@ -151,6 +151,24 @@ bool CheckSignetBlockSolution(const CBlock& block, const Consensus::Params& cons
 }
 
 // !ALPHA SIGNET FORK
+std::vector<CPubKey> ExtractPubkeysFromChallenge(const std::vector<uint8_t>& challenge)
+{
+    std::vector<CPubKey> result;
+    CScript script(challenge.begin(), challenge.end());
+    opcodetype opcode;
+    std::vector<uint8_t> pushdata;
+    CScript::const_iterator pc = script.begin();
+    while (script.GetOp(pc, opcode, pushdata)) {
+        if (pushdata.size() == CPubKey::COMPRESSED_SIZE) {
+            CPubKey pk(pushdata);
+            if (pk.IsFullyValid()) {
+                result.push_back(pk);
+            }
+        }
+    }
+    return result;
+}
+
 bool CheckSignetBlockSolution(const CBlock& block, const Consensus::Params& consensusParams, int nHeight)
 {
     // Only enforce after activation height
@@ -158,12 +176,35 @@ bool CheckSignetBlockSolution(const CBlock& block, const Consensus::Params& cons
         return true;  // Pre-fork: no authorization required
     }
 
-    // Use the Alpha-specific challenge script
+    if (consensusParams.signet_challenge_alpha.empty()) {
+        LogPrint(BCLog::VALIDATION, "CheckSignetBlockSolution (Alpha fork): no challenge configured at height %d\n", nHeight);
+        return false;
+    }
+
+    // Explicit SIGNET_HEADER check — reject blocks without it
+    if (block.vtx.empty()) return false;
+    const int cidx = GetWitnessCommitmentIndex(block);
+    if (cidx == NO_WITNESS_COMMITMENT) {
+        LogPrint(BCLog::VALIDATION, "CheckSignetBlockSolution (Alpha fork): no witness commitment at height %d\n", nHeight);
+        return false;
+    }
+    {
+        // Work on a copy — FetchAndClearCommitmentSection mutates its argument
+        CScript commitment_copy = block.vtx[0]->vout.at(cidx).scriptPubKey;
+        std::vector<uint8_t> dummy;
+        if (!FetchAndClearCommitmentSection(SIGNET_HEADER, commitment_copy, dummy)) {
+            LogPrint(BCLog::VALIDATION, "CheckSignetBlockSolution (Alpha fork): "
+                "missing SIGNET_HEADER at height %d\n", nHeight);
+            return false;
+        }
+    }
+
+    // Standard signet verification
     const CScript challenge(consensusParams.signet_challenge_alpha.begin(), consensusParams.signet_challenge_alpha.end());
     const std::optional<SignetTxs> signet_txs = SignetTxs::Create(block, challenge);
 
     if (!signet_txs) {
-        LogPrint(BCLog::VALIDATION, "CheckSignetBlockSolution (Alpha fork): block solution parse failure at height %d\n", nHeight);
+        LogPrint(BCLog::VALIDATION, "CheckSignetBlockSolution (Alpha fork): parse failure at height %d\n", nHeight);
         return false;
     }
 

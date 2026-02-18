@@ -17,6 +17,10 @@
 #include <util/strencodings.h>
 #include <util/string.h>
 
+// !ALPHA SIGNET FORK
+#include <pubkey.h>
+// !ALPHA SIGNET FORK END
+
 #include <cassert>
 #include <cstdint>
 #include <limits>
@@ -101,6 +105,46 @@ void ReadRegTestArgs(const ArgsManager& args, CChainParams::RegTestOptions& opti
     }
 }
 
+// !ALPHA SIGNET FORK
+void ReadAlphaSignetForkArgs(const ArgsManager& args, CChainParams::AlphaSignetForkOptions& options)
+{
+    if (args.IsArgSet("-signetforkheight")) {
+        int32_t height;
+        if (!ParseInt32(args.GetArg("-signetforkheight", "0"), &height) || height < 0) {
+            throw std::runtime_error("-signetforkheight must be a non-negative integer.");
+        }
+        options.fork_height = height;
+    }
+    if (args.IsArgSet("-signetforkpubkeys")) {
+        const std::string val = args.GetArg("-signetforkpubkeys", "");
+        if (val.empty()) {
+            throw std::runtime_error("-signetforkpubkeys must not be empty.");
+        }
+        std::vector<std::string> hex_keys = SplitString(val, ',');
+        for (const auto& hex_key : hex_keys) {
+            auto parsed = TryParseHex<uint8_t>(hex_key);
+            if (!parsed || parsed->size() != CPubKey::COMPRESSED_SIZE) {
+                throw std::runtime_error(strprintf(
+                    "-signetforkpubkeys: '%s' is not a valid 33-byte compressed pubkey hex.", hex_key));
+            }
+            CPubKey pk(*parsed);
+            if (!pk.IsFullyValid()) {
+                throw std::runtime_error(strprintf(
+                    "-signetforkpubkeys: '%s' is not a valid secp256k1 point.", hex_key));
+            }
+        }
+        options.pubkeys_hex = hex_keys;
+    }
+    // Cross-validation
+    if (options.fork_height && *options.fork_height > 0 && !options.pubkeys_hex) {
+        throw std::runtime_error("-signetforkheight > 0 requires -signetforkpubkeys.");
+    }
+    if (options.pubkeys_hex && (!options.fork_height || *options.fork_height <= 0)) {
+        throw std::runtime_error("-signetforkpubkeys requires -signetforkheight > 0.");
+    }
+}
+// !ALPHA SIGNET FORK END
+
 static std::unique_ptr<const CChainParams> globalChainParams;
 
 const CChainParams &Params() {
@@ -144,10 +188,14 @@ std::unique_ptr<const CChainParams> CreateChainParams(const ArgsManager& args, c
     case ChainType::ALPHAREGTEST: {
         auto opts = CChainParams::RegTestOptions{};
         ReadRegTestArgs(args, opts);
-        return CChainParams::AlphaRegTest(opts);
+        auto fork_opts = CChainParams::AlphaSignetForkOptions{};
+        ReadAlphaSignetForkArgs(args, fork_opts);
+        return CChainParams::AlphaRegTest(opts, fork_opts);
     }
     case ChainType::ALPHATESTNET: {
-        return CChainParams::AlphaTestNet();
+        auto fork_opts = CChainParams::AlphaSignetForkOptions{};
+        ReadAlphaSignetForkArgs(args, fork_opts);
+        return CChainParams::AlphaTestNet(fork_opts);
     }
     case ChainType::ALPHAMAIN: {
         return CChainParams::AlphaMain();
