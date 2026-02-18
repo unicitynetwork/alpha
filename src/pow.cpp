@@ -309,21 +309,6 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
     // Use ASERT DAA if activated, otherwise use legacy Bitcoin DAA
     if (params.asertAnchorParams) {
         if (pindexLast->nHeight + 1 >= params.nASERTActivationHeight) {
-            // !ALPHA SIGNET FORK - Use post-fork ASERT anchor after activation
-            if (g_isAlpha && params.asertAnchorPostFork && params.nSignetActivationHeight > 0
-                && pindexLast->nHeight + 1 > params.nSignetActivationHeight) {
-                // Build the runtime anchor using block 449999's actual timestamp
-                Consensus::Params::ASERTAnchor runtimeAnchor = *params.asertAnchorPostFork;
-                if (runtimeAnchor.nPrevBlockTime == 0) {
-                    // Resolve from chain: get block at (nSignetActivationHeight - 1)
-                    // nPrevBlockTime = timestamp of block immediately before the anchor
-                    const CBlockIndex* pForkPrev = pindexLast->GetAncestor(params.nSignetActivationHeight - 1);
-                    assert(pForkPrev != nullptr);
-                    runtimeAnchor.nPrevBlockTime = pForkPrev->GetBlockTime();
-                }
-                return GetNextASERTWorkRequired(pindexLast, pblock, params, runtimeAnchor);
-            }
-            // !ALPHA SIGNET FORK END
             return GetNextASERTWorkRequired(pindexLast, pblock, params, *params.asertAnchorParams);
         }
     }

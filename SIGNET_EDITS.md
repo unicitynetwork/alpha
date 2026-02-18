@@ -31,7 +31,7 @@ The fork implements three simultaneous consensus rule changes that activate atom
 
 1. **Zero block subsidy** -- The block reward drops from 5 ALPHA (post-halving from the 400,000-block halving) to 0. Block producers are compensated only by transaction fees. This eliminates the economic incentive for unauthorized miners to extend the chain.
 
-2. **Difficulty reset** -- The difficulty for block 450,000 is forced to `powLimit` (minimum difficulty), preventing a chain stall. After block 450,000, a new ASERT anchor rooted at the fork block governs difficulty adjustment, ensuring the 2-minute target is maintained despite the abrupt transition in block producers.
+2. **Difficulty reset** -- The difficulty for block 450,000 is forced to `powLimit` (minimum difficulty), preventing a chain stall. After block 450,000, the existing ASERT anchor from block 70,232 continues to govern difficulty adjustment. Since the chain has maintained ~2-minute blocks, ASERT naturally computes a difficulty near `powLimit` for post-fork blocks.
 
 3. **Signet-style block authorization** -- Every block at height >= 450,000 must carry a valid signature from one of five authorized keys, embedded in the coinbase witness commitment using the BIP325 signet mechanism. Blocks lacking a valid signature are rejected by all consensus rules.
 
@@ -62,7 +62,7 @@ Block 450,000 (first fork block)
      |
      +--- Difficulty: GetNextWorkRequired() returns nProofOfWorkLimit
      |     (minimum difficulty, so the block is trivially solvable)
-     |     Future blocks: ASERT from new anchor at (450000, powLimit)
+     |     Future blocks: existing ASERT anchor naturally returns ~powLimit
      |
      +--- Authorization: CheckSignetBlockSolution(block, params, 450000)
            Must find SIGNET_HEADER in coinbase witness commitment
@@ -89,7 +89,6 @@ The three changes interact in a specific order within the validation pipeline. D
 +    // !ALPHA SIGNET FORK
 +    int nSignetActivationHeight{0};              // Height at which signet authorization activates (0 = never)
 +    std::vector<uint8_t> signet_challenge_alpha;  // Challenge script for height-gated signet (separate from signet_challenge)
-+    std::optional<ASERTAnchor> asertAnchorPostFork; // New ASERT anchor for post-fork difficulty
 +    // !ALPHA SIGNET FORK END
 +
      // !SCASH END
@@ -102,9 +101,7 @@ The three changes interact in a specific order within the validation pipeline. D
 
 - `std::vector<uint8_t> signet_challenge_alpha` -- The serialized Script that authorized block producers must satisfy. The name deliberately differs from the existing `signet_challenge` field (which belongs to the `signet_blocks` BIP325 chain-wide signet mechanism) to avoid any risk of confusion or accidental cross-activation. The type matches `signet_challenge` exactly so the same `CScript` construction idiom works: `CScript(signet_challenge_alpha.begin(), signet_challenge_alpha.end())`.
 
-- `std::optional<ASERTAnchor> asertAnchorPostFork` -- Reuses the existing `ASERTAnchor` inner struct (which holds `nHeight`, `nBits`, and `nPrevBlockTime`) as the anchor for the post-fork difficulty adjustment algorithm. The `std::optional` wrapper allows this to be `std::nullopt` on networks (testnet, regtest) that do not use ASERT after the fork. On mainnet, the `nPrevBlockTime` field is stored as `0` (a sentinel value) because the actual timestamp of block 449,999 is not known at compile time; it is resolved at runtime from the chain index.
-
-**Cross-references:** Every other modified file reads these three fields. The initializers here ensure backward compatibility: code compiled without any chain configuration will have `nSignetActivationHeight == 0` and all guards will silently pass.
+**Cross-references:** Every other modified file reads these two fields. The initializers here ensure backward compatibility: code compiled without any chain configuration will have `nSignetActivationHeight == 0` and all guards will silently pass.
 
 **Security implications:** Placing `nSignetActivationHeight{0}` in the struct definition rather than relying on absence of a configuration is a defensive choice. It guarantees that a new chain type inadvertently omitting this field cannot accidentally activate the fork, because the value defaults to "never active."
 
@@ -117,12 +114,6 @@ The three changes interact in a specific order within the validation pipeline. D
 **Full path:** `/home/vrogojin/alpha/src/kernel/chainparams.cpp`
 
 #### Mainnet (CMainParams) changes
-
-```diff
-+#include <arith_uint256.h>
-```
-
-**Why this include was added:** The mainnet configuration uses `UintToArith256(consensus.powLimit).GetCompact()` to compute the compact representation of `powLimit` for the post-fork ASERT anchor's `nBits`. `UintToArith256` is declared in `<arith_uint256.h>`. This include was not needed before this change.
 
 ```diff
 +        // !ALPHA SIGNET FORK
@@ -140,13 +131,6 @@ The three changes interact in a specific order within the validation pipeline. D
 +            "55"                                                              // OP_5
 +            "ae"                                                              // OP_CHECKMULTISIG
 +        );
-+
-+        // Post-fork ASERT anchor: nBits = powLimit, nPrevBlockTime resolved at runtime from block 449999
-+        consensus.asertAnchorPostFork = Consensus::Params::ASERTAnchor{
-+            450000,                                     // anchor block height (the fork block)
-+            UintToArith256(consensus.powLimit).GetCompact(),  // nBits = powLimit
-+            0,                                          // nPrevBlockTime = 0 (sentinel; resolved at runtime)
-+        };
 +        // !ALPHA SIGNET FORK END
 ```
 
@@ -165,21 +149,17 @@ The three changes interact in a specific order within the validation pipeline. D
 
   The choice of bare multisig (rather than P2SH or P2WSH wrapping) is consistent with the Bitcoin signet design, where the challenge is placed directly as the scriptPubKey of the `m_to_spend` output in the synthetic signing transaction pair. Bare multisig scripts can be verified by `VerifyScript` without any additional wrapping.
 
-- `consensus.asertAnchorPostFork` -- The ASERT anchor anchors the difficulty adjustment curve at a specific (height, nBits, prevTime) point. Setting `nBits = powLimit` means that block 450,000 starts from minimum difficulty regardless of what the difficulty was just before the fork. This is consistent with the explicit difficulty reset in `pow.cpp` (which forces `nProofOfWorkLimit` for block 450,000 itself). The `nPrevBlockTime = 0` sentinel is resolved at runtime in `pow.cpp` by walking the chain index to block 449,999. This runtime resolution is necessary because the timestamp of block 449,999 is not known at compile time and must match the actual chain.
-
 #### Testnet (CTestNetParams) changes
 
 ```diff
 +        // !ALPHA SIGNET FORK
 +        consensus.nSignetActivationHeight = 200;  // Low height for testing
 +        consensus.signet_challenge_alpha = ParseHex("51");  // OP_TRUE (trivial challenge, no signature needed)
-+        consensus.asertAnchorPostFork = std::nullopt;
 +        // !ALPHA SIGNET FORK END
 ```
 
 - `nSignetActivationHeight = 200` -- A low height that can be reached quickly in a test environment.
 - `signet_challenge_alpha = ParseHex("51")` -- `0x51` is `OP_1`, which evaluates to true with any witness. In Script execution this behaves as an always-passing challenge, so no signing key is required on testnet. This allows any node to produce post-fork blocks on testnet without a configured key.
-- `asertAnchorPostFork = std::nullopt` -- Testnet does not use ASERT (the ASERT configuration block in testnet is commented out in chainparams.cpp), so there is no post-fork anchor needed.
 
 #### Regtest (CRegTestParams) changes
 
@@ -187,7 +167,6 @@ The three changes interact in a specific order within the validation pipeline. D
 +        // !ALPHA SIGNET FORK
 +        consensus.nSignetActivationHeight = 200;  // Low height for testing
 +        consensus.signet_challenge_alpha = ParseHex("51");  // OP_TRUE (trivial challenge, no signature needed)
-+        consensus.asertAnchorPostFork = std::nullopt;
 +        // !ALPHA SIGNET FORK END
 ```
 
@@ -196,7 +175,6 @@ Identical to testnet for the same reasons. Regtest at height 200 will enforce ze
 **Cross-references:**
 - The `nSignetActivationHeight` value is read by `validation.cpp`, `pow.cpp`, `signet.cpp`, `node/miner.cpp`, `rpc/mining.cpp`, and `init.cpp`.
 - The `signet_challenge_alpha` bytes are read by `signet.cpp` (validation), `node/miner.cpp` (signing), and `init.cpp` (key validation at startup).
-- The `asertAnchorPostFork` struct is read only by `pow.cpp`.
 
 ---
 
@@ -490,43 +468,7 @@ This guard checks whether the block being computed (`pindexLast->nHeight + 1`) i
 
 Why a difficulty reset is necessary: In the weeks or months before block 450,000, mining activity on the Alpha mainnet is driven by economic incentive (the 5 ALPHA block subsidy). ASERT continuously adjusts difficulty to maintain the 2-minute target. At block 450,000, the subsidy drops to zero. If the only authorized block producers are the five keyholders and they are not running industrial mining equipment, they would be unable to find blocks at the difficulty level established by RandomX miners. The explicit reset to minimum difficulty ensures the first post-fork block can be produced essentially immediately, and ASERT then adjusts from there.
 
-```diff
-+            // !ALPHA SIGNET FORK - Use post-fork ASERT anchor after activation
-+            if (g_isAlpha && params.asertAnchorPostFork && params.nSignetActivationHeight > 0
-+                && pindexLast->nHeight + 1 > params.nSignetActivationHeight) {
-+                // Build the runtime anchor using block 449999's actual timestamp
-+                Consensus::Params::ASERTAnchor runtimeAnchor = *params.asertAnchorPostFork;
-+                if (runtimeAnchor.nPrevBlockTime == 0) {
-+                    // Resolve from chain: get block at (nSignetActivationHeight - 1)
-+                    // nPrevBlockTime = timestamp of block immediately before the anchor
-+                    const CBlockIndex* pForkPrev = pindexLast->GetAncestor(params.nSignetActivationHeight - 1);
-+                    assert(pForkPrev != nullptr);
-+                    runtimeAnchor.nPrevBlockTime = pForkPrev->GetBlockTime();
-+                }
-+                return GetNextASERTWorkRequired(pindexLast, pblock, params, runtimeAnchor);
-+            }
-+            // !ALPHA SIGNET FORK END
-            return GetNextASERTWorkRequired(pindexLast, pblock, params, *params.asertAnchorParams);
-```
-
-**Line-by-line explanation:**
-
-This block intercepts the ASERT path for all blocks strictly after the fork height (`> nSignetActivationHeight`). It constructs a modified ASERT anchor `runtimeAnchor` on the fly.
-
-The ASERT algorithm requires three values from its anchor block:
-- `nHeight` -- The height of the anchor block. Set to `450000`.
-- `nBits` -- The difficulty of the anchor block. Set to `powLimit` (minimum difficulty, matching the reset).
-- `nPrevBlockTime` -- The timestamp of the block immediately before the anchor. This is block 449,999's actual timestamp.
-
-The `nPrevBlockTime = 0` sentinel in the chainparams configuration is replaced here with the real timestamp from the chain index by calling `pindexLast->GetAncestor(nSignetActivationHeight - 1)->GetBlockTime()`. The `assert(pForkPrev != nullptr)` is safe because by the time this code runs (computing difficulty for block 450,001 or later), block 449,999 is definitionally present in the chain.
-
-Why a new anchor is needed: Without this change, after the fork, ASERT would continue using the original anchor from block 70,232 (`asertAnchorParams`). That anchor's difficulty curve was calibrated for the pre-fork chain, where blocks were being found at the difficulty level established by thousands of RandomX miners. The post-fork anchor at minimum difficulty correctly initializes a new difficulty curve appropriate for the federated block production environment.
-
-The condition `pindexLast->nHeight + 1 > params.nSignetActivationHeight` (strictly greater than, not greater-than-or-equal) correctly handles the first fork block (450,000): that block's difficulty was already handled by the explicit `nProofOfWorkLimit` return above. The ASERT path is only reached for block 450,001 onward.
-
-**Cross-references:**
-- `GetNextASERTWorkRequired` is defined elsewhere in `pow.cpp` and is not modified.
-- The `ASERTAnchor` struct used here is defined in `src/consensus/params.h`.
+After the difficulty reset at block 450,000, blocks 450,001 onward continue to use the existing ASERT anchor from block 70,232 (`asertAnchorParams`). No new post-fork anchor is needed because the original anchor was set to `powLimit` when ASERT was activated at the SHA256-to-RandomX transition. Since ASERT has maintained approximately 2-minute blocks throughout the chain's history, the cumulative time drift from the anchor is minimal, and ASERT naturally computes a difficulty close to `powLimit` for post-fork blocks. This is the same pattern that worked successfully during the SHA256-to-RandomX mining transition.
 
 ---
 
@@ -939,11 +881,9 @@ The current code contains placeholder public keys in `src/kernel/chainparams.cpp
 
 4. **Distribute WIF private keys to authorized operators.** Each of the five operators receives their own WIF-encoded private key and configures it in their `alpha.conf`. They confirm startup by checking the log for their key's public key prefix.
 
-5. **Verify the ASERT anchor.** The `asertAnchorPostFork.nBits` is computed from `consensus.powLimit`, which does not change between compiles. No action needed. The `nPrevBlockTime` is resolved at runtime.
+5. **Coordinate the deployment timeline.** The binary must be deployed to all full nodes on the network before block 450,000. Any node running old code at block 450,000 will have its `FatalError` timebomb trigger, forcing it offline. Nodes running the new code will transition seamlessly.
 
-6. **Coordinate the deployment timeline.** The binary must be deployed to all full nodes on the network before block 450,000. Any node running old code at block 450,000 will have its `FatalError` timebomb trigger, forcing it offline. Nodes running the new code will transition seamlessly.
-
-7. **Signed binary distribution.** The binary should be signed by a trusted key (e.g., a project GPG key) and the signature published alongside the release. Node operators should verify the signature before deploying.
+6. **Signed binary distribution.** The binary should be signed by a trusted key (e.g., a project GPG key) and the signature published alongside the release. Node operators should verify the signature before deploying.
 
 ---
 
@@ -1087,7 +1027,7 @@ The witness commitment hash covers the witness data of all transactions. The sig
 
 ### Correctness
 
-The four-way coordination between zero subsidy, difficulty reset, post-fork ASERT anchor, and signet authorization is logically consistent:
+The three-way coordination between zero subsidy, difficulty reset, and signet authorization is logically consistent:
 
 - Block 449999: last pre-fork block. Normal rules.
 - Block 450000 (`nHeight == nSignetActivationHeight`):
@@ -1097,7 +1037,7 @@ The four-way coordination between zero subsidy, difficulty reset, post-fork ASER
   - The template for this block is produced by `CreateNewBlock` with the signing logic embedded.
 - Block 450001+:
   - Subsidy remains 0.
-  - ASERT uses `asertAnchorPostFork` with `nBits = powLimit` and actual timestamp of block 449999.
+  - ASERT continues using the original anchor from block 70,232; since the chain has maintained ~2-minute blocks, the computed difficulty remains near `powLimit`.
   - Authorization required.
 
 ### Open Issues
@@ -1106,15 +1046,11 @@ The four-way coordination between zero subsidy, difficulty reset, post-fork ASER
 
 2. **SIGNET_HEADER duplication.** The constant `{0xec, 0xc7, 0xda, 0xa2}` is defined independently in `signet.cpp` (line 26, as a file-scope `static constexpr`) and again in `miner.cpp` (line 239, as a function-local `static constexpr`). If the header bytes are ever modified in one place but not the other, produced blocks will fail validation. This constant should be moved to `signet.h` as a shared exported constant.
 
-3. **`GetAncestor` called on every post-fork difficulty computation.** The timestamp of block 449999 is fetched via `pindexLast->GetAncestor(nSignetActivationHeight - 1)` on every call to `GetNextWorkRequired` for heights > 450000. This is deterministic and correct but slightly wasteful. Caching the resolved timestamp in a local static or in `asertAnchorPostFork` after first resolution would improve performance.
+3. **`-server` as template-mode proxy.** The startup key check uses `-server` to identify template-serving mode. Nodes running with `-server` but without `-signetblockkey` will start normally post-fork but will be unable to produce block templates (RPC callers will receive an error). Operators who want to mine should configure `-signetblockkey`.
 
-4. **`-server` as template-mode proxy.** The startup key check uses `-server` to identify template-serving mode. Nodes running with `-server` but without `-signetblockkey` will start normally post-fork but will be unable to produce block templates (RPC callers will receive an error). Operators who want to mine should configure `-signetblockkey`.
+4. **Hardcoded "5" in error message** at `init.cpp` line 1859 should be derived from parsing the challenge script rather than hardcoded.
 
-5. **Hardcoded "5" in error message** at `init.cpp` line 1859 should be derived from parsing the challenge script rather than hardcoded.
-
-6. **No unit tests for the new consensus rules.** The existing test framework (functional tests and unit tests inherited from Bitcoin Core) does not include tests specific to the `nSignetActivationHeight` path. Test coverage for: (a) zero-subsidy at exactly height 450000 vs 449999; (b) difficulty reset at the boundary; (c) signet check accept/reject at the boundary; (d) post-fork ASERT anchor resolution; should be added before deployment.
-
-7. **Testnet/regtest `asertAnchorPostFork = std::nullopt`.** With `std::nullopt`, the post-fork ASERT branch in `pow.cpp` is not entered on test chains. Testnet/regtest post-fork blocks will fall back to the pre-fork ASERT anchor or the legacy Bitcoin DAA path depending on chain configuration. The testnet `asertAnchorParams` is commented out in the current code (`/* ... */`), so testnet has no ASERT DAA at all. This means testnet difficulty after the fork (at height 200 for testing) will use the legacy retargeting algorithm. This is acceptable for test purposes but should be documented.
+5. **No unit tests for the new consensus rules.** The existing test framework (functional tests and unit tests inherited from Bitcoin Core) does not include tests specific to the `nSignetActivationHeight` path. Test coverage for: (a) zero-subsidy at exactly height 450000 vs 449999; (b) difficulty reset at the boundary; (c) signet check accept/reject at the boundary; should be added before deployment.
 
 ---
 
@@ -1124,12 +1060,12 @@ The four-way coordination between zero subsidy, difficulty reset, post-fork ASER
 
 | File | Changes | Purpose |
 |------|---------|---------|
-| `src/consensus/params.h` | Added 3 new fields to `struct Params` | Fork activation height, challenge script, post-fork ASERT anchor |
+| `src/consensus/params.h` | Added 2 new fields to `struct Params` | Fork activation height, challenge script |
 | `src/kernel/chainparams.cpp` | Added fork params for mainnet/testnet/regtest | Configure fork parameters per chain |
 | `src/signet.h` | Added height-aware function declaration | `CheckSignetBlockSolution` overload with height parameter |
 | `src/signet.cpp` | Implemented height-aware overload | Height-gated signet verification using `signet_challenge_alpha` |
 | `src/validation.cpp` | 4 edits: zero subsidy, timebomb removal, 2 signet checks | Core consensus enforcement |
-| `src/pow.cpp` | 2 edits: difficulty reset, post-fork ASERT anchor | Prevent chain stall at fork |
+| `src/pow.cpp` | 1 edit: difficulty reset at fork height | Prevent chain stall at fork |
 | `src/node/miner.h` | Added global key declaration | `extern CKey g_alpha_signet_key` |
 | `src/node/miner.cpp` | Added key definition + template signing logic | Embed BIP325 signet solution in block templates |
 | `src/init.cpp` | Added arg registration + startup key validation | `-signetblockkey` parameter with allowlist check |

@@ -183,7 +183,6 @@ struct Params {
     // !ALPHA SIGNET FORK
     int nSignetActivationHeight{0};              // Height at which signet authorization activates (0 = never)
     std::vector<uint8_t> signet_challenge_alpha;  // Challenge script for height-gated signet (separate from signet_challenge)
-    std::optional<ASERTAnchor> asertAnchorPostFork; // New ASERT anchor for post-fork difficulty
     // !ALPHA SIGNET FORK END
 
     // !SCASH END

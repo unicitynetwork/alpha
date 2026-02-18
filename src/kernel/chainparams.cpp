@@ -7,7 +7,6 @@
 
 #include <kernel/chainparams.h>
 
-#include <arith_uint256.h>
 #include <chainparamsseeds.h>
 #include <consensus/amount.h>
 #include <consensus/merkle.h>
@@ -163,13 +162,6 @@ public:
             "55"                                                              // OP_5
             "ae"                                                              // OP_CHECKMULTISIG
         );
-
-        // Post-fork ASERT anchor: nBits = powLimit, nPrevBlockTime resolved at runtime from block 449999
-        consensus.asertAnchorPostFork = Consensus::Params::ASERTAnchor{
-            450000,                                     // anchor block height (the fork block)
-            UintToArith256(consensus.powLimit).GetCompact(),  // nBits = powLimit
-            0,                                          // nPrevBlockTime = 0 (sentinel; resolved at runtime)
-        };
         // !ALPHA SIGNET FORK END
 
         consensus.fPowRandomX = true;
@@ -290,7 +282,6 @@ public:
         // !ALPHA SIGNET FORK
         consensus.nSignetActivationHeight = 200;  // Low height for testing
         consensus.signet_challenge_alpha = ParseHex("51");  // OP_TRUE (trivial challenge, no signature needed)
-        consensus.asertAnchorPostFork = std::nullopt;
         // !ALPHA SIGNET FORK END
 
         pchMessageStart[0] = 0x0d;
@@ -404,7 +395,6 @@ public:
         // !ALPHA SIGNET FORK
         consensus.nSignetActivationHeight = 200;  // Low height for testing
         consensus.signet_challenge_alpha = ParseHex("51");  // OP_TRUE (trivial challenge, no signature needed)
-        consensus.asertAnchorPostFork = std::nullopt;
         // !ALPHA SIGNET FORK END
 
         consensus.fPowRandomX = true;
