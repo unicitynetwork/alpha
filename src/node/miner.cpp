@@ -193,9 +193,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
         && nHeight >= chainparams.GetConsensus().nSignetActivationHeight) {
 
         if (!g_alpha_signet_key.IsValid()) {
-            throw std::runtime_error(strprintf(
-                "%s: No signing key available for post-fork block at height %d. "
-                "Configure -signetblockkey in alpha.conf", __func__, nHeight));
+            throw std::runtime_error("No signing key configured. Set -signetblockkey in alpha.conf to produce blocks.");
         }
 
         const Consensus::Params& cparams = chainparams.GetConsensus();

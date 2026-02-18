@@ -1814,8 +1814,8 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
 
             if (strKey.empty()) {
                 if (forkActive) {
-                    return InitError(_("Alpha fork is active: -signetblockkey is required in template-serving mode. "
-                        "Add signetblockkey=<WIF> to your alpha.conf file."));
+                    LogPrintf("WARNING: Alpha fork is active but no -signetblockkey configured. "
+                        "Block templates will be unavailable. Add signetblockkey=<WIF> to alpha.conf to enable mining.\n");
                 } else {
                     LogPrintf("WARNING: Alpha fork activates at height %d (current: %d). "
                         "Configure -signetblockkey before fork activation.\n",

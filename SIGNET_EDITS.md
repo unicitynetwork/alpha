@@ -37,7 +37,7 @@ The fork implements three simultaneous consensus rule changes that activate atom
 
 In addition to the three consensus changes, four supporting infrastructure changes enable authorized nodes to produce valid blocks:
 
-4. **Startup key validation** -- On nodes running in template-serving mode (`-server`), the new `-signetblockkey` parameter is parsed, decoded from WIF, and validated against the authorized public keys in the challenge script. The node refuses to start if the fork is active and no valid key is configured.
+4. **Startup key validation** -- On nodes running in template-serving mode (`-server`), the new `-signetblockkey` parameter is parsed, decoded from WIF, and validated against the authorized public keys in the challenge script. The node logs a warning if the fork is active and no valid key is configured, but continues to run normally as a non-mining full node.
 
 5. **Template signing** -- `CreateNewBlock()` automatically appends the SIGNET_HEADER and serialized signature to the coinbase witness commitment output of every block template it produces for heights >= 450,000. The Merkle root is recomputed after this modification.
 
@@ -377,9 +377,7 @@ The global variable definition (corresponding to the `extern` declaration in `mi
 +        && nHeight >= chainparams.GetConsensus().nSignetActivationHeight) {
 +
 +        if (!g_alpha_signet_key.IsValid()) {
-+            throw std::runtime_error(strprintf(
-+                "%s: No signing key available for post-fork block at height %d. "
-+                "Configure -signetblockkey in alpha.conf", __func__, nHeight));
++            throw std::runtime_error("No signing key configured. Set -signetblockkey in alpha.conf to produce blocks.");
 +        }
 +
 +        const Consensus::Params& cparams = chainparams.GetConsensus();
@@ -448,7 +446,7 @@ The placement of this block is significant. It occurs after:
 
 This ordering is required because `SignetTxs::Create` reads the block's witness commitment to find the signing point, and the commitment must be present before signing begins.
 
-1. **Guard check** -- `g_alpha_signet_key.IsValid()` is checked as a belt-and-suspenders guard. In normal operation, `AppInitMain` will have already refused to start if the key is missing and the fork is active. This guard is defense-in-depth for edge cases (e.g., a regtest node where the startup validation is not triggered because the fork is not approaching).
+1. **Guard check** -- `g_alpha_signet_key.IsValid()` is checked to catch calls from nodes that started without a signing key configured. Since the startup validation only logs a warning (rather than refusing to start) when the fork is active and no key is present, this guard ensures that any RPC caller requesting a block template receives a clear error message rather than producing an invalid block.
 
 2. **`SignetTxs::Create(*pblock, challenge)`** -- When called during signing, the block's coinbase will have a witness commitment but no `SIGNET_HEADER` section yet. In this case `FetchAndClearCommitmentSection` does not find the header, `signet_solution` remains empty, and `tx_spending.vin[0].scriptSig` and `witness.stack` are both empty. The signing transaction pair is constructed with an empty spending input, which is what will be signed.
 
@@ -710,7 +708,7 @@ Note that internal nodes (those with `-signetblockkey` configured) do not need t
 
 - `forkApproaching` -- `true` when the chain tip is within 1,000 blocks of the fork (i.e., block 449,000 or later). In this state, the node issues a warning but does not fail startup. This gives operators a window of approximately 33 hours (1,000 blocks × 2 minutes) to configure the key before it becomes mandatory.
 
-- `forkActive` -- `true` when the chain tip is at or past block 450,000. In this state, a server-mode node without a valid signing key cannot start.
+- `forkActive` -- `true` when the chain tip is at or past block 450,000. In this state, a server-mode node without a valid signing key logs a warning but continues to start normally. The node can sync the chain and serve as a full node; it just cannot produce signed block templates.
 
 The key validation procedure when a key is provided:
 
@@ -852,7 +850,7 @@ AppInitMain()
     |     if no -signetblockkey: log WARNING, continue
     |     if -signetblockkey provided: validate and load
     +-- if chain_active_height >= 450000:
-    |     if no -signetblockkey: FAIL with InitError
+    |     if no -signetblockkey: log WARNING, continue (node runs as non-mining full node)
     |     if -signetblockkey provided: validate and load
     |
     v
@@ -1126,7 +1124,7 @@ The four-way coordination between zero subsidy, difficulty reset, post-fork ASER
 
 3. **`GetAncestor` called on every post-fork difficulty computation.** The timestamp of block 449999 is fetched via `pindexLast->GetAncestor(nSignetActivationHeight - 1)` on every call to `GetNextWorkRequired` for heights > 450000. This is deterministic and correct but slightly wasteful. Caching the resolved timestamp in a local static or in `asertAnchorPostFork` after first resolution would improve performance.
 
-4. **`-server` as template-mode proxy.** The startup key check uses `-server` to identify template-serving mode. This is a reasonable choice but is documented nowhere as a requirement. Operators running post-fork nodes should understand that `-server` implies key material must be configured.
+4. **`-server` as template-mode proxy.** The startup key check uses `-server` to identify template-serving mode. Nodes running with `-server` but without `-signetblockkey` will start normally post-fork but will be unable to produce block templates (RPC callers will receive an error). Operators who want to mine should configure `-signetblockkey`.
 
 5. **Hardcoded "5" in error message** at `init.cpp` line 1859 should be derived from parsing the challenge script rather than hardcoded.
 
