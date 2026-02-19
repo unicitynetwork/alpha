@@ -36,7 +36,7 @@ The fork implements three simultaneous consensus rule changes that activate atom
 
 In addition to the three consensus changes, four supporting infrastructure changes enable authorized nodes to produce valid blocks:
 
-4. **Startup key validation** -- On nodes running in template-serving mode (`-server`), the new `-signetblockkey` parameter is parsed, decoded from WIF, and validated against the authorized public keys in the challenge script. The node logs a warning if the fork is active and no valid key is configured, but continues to run normally as a non-mining full node.
+4. **Startup key validation** -- If `-signetblockkey` is provided, the key is always validated against the authorized public keys in the challenge script, regardless of `-server` mode or current chain height. This ensures operators discover misconfiguration immediately at startup, not when the fork activates. If no key is configured, the node starts normally as a non-mining full node.
 
 5. **Template signing** -- `CreateNewBlock()` automatically appends the SIGNET_HEADER and serialized signature to the coinbase witness commitment output of every block template it produces for heights >= 450,000. The Merkle root is recomputed after this modification.
 
@@ -707,15 +707,18 @@ This removes the old mechanism that forced node shutdown at block 450,000. That 
 #### Startup key validation
 
 ```diff
-+    // !ALPHA SIGNET FORK - Validate signing key at startup (template-serving mode only)
-+    if (g_isAlpha) {
++    // !ALPHA SIGNET FORK - Validate signing key at startup
++    // If -signetblockkey is provided, always validate it against the authorized
++    // pubkeys regardless of -server mode or current chain height. This ensures
++    // operators discover misconfiguration immediately, not when the fork activates.
++    // If -signetblockkey is not set, that is fine — the node simply will not
++    // produce blocks.
++    if (g_isAlpha && chainman.GetConsensus().nSignetActivationHeight > 0) {
 +        const Consensus::Params& forkParams = chainman.GetConsensus();
-+        const bool isTemplateMode = args.GetBoolArg("-server", false);
-+        const bool forkActive = (forkParams.nSignetActivationHeight > 0) &&
-+            (chain_active_height >= forkParams.nSignetActivationHeight);
++        const std::string strKey = args.GetArg("-signetblockkey", "");
 +
-+        if (isTemplateMode && forkActive) {
-+            // ... key validation logic ...
++        if (!strKey.empty()) {
++            // ... key validation logic (WIF decode, pubkey derivation, allowlist check) ...
 +        }
 +    }
 +    // !ALPHA SIGNET FORK END
@@ -723,9 +726,9 @@ This removes the old mechanism that forced node shutdown at block 450,000. That 
 
 **Line-by-line explanation:**
 
-- `isTemplateMode` -- `true` when `-server` is passed, meaning this node accepts RPC connections and can serve block templates. Nodes not in server mode (e.g., plain peers, offline signers, block explorers) do not need a signing key and are not validated.
+- The outer guard `g_isAlpha && nSignetActivationHeight > 0` ensures this code only runs on the Alpha chain where the signet fork is configured. There is no `-server` mode gate and no chain-height gate — if a key is provided, it is validated immediately regardless of node role or sync state.
 
-- `forkActive` -- `true` when the chain tip is at or past block 450,000. In this state, a server-mode node without a valid signing key logs a warning but continues to start normally. The node can sync the chain and serve as a full node; it just cannot produce signed block templates.
+- `if (!strKey.empty())` — validation only fires when `-signetblockkey` is explicitly set. If the argument is absent or empty, the node starts normally and simply will not produce blocks. No warning is logged for an absent key, since most nodes (peers, explorers, wallets) are not miners.
 
 The key validation procedure when a key is provided:
 
@@ -746,7 +749,6 @@ The allowlist check at startup serves two purposes. First, it prevents misconfig
 **Cross-references:**
 - `g_alpha_signet_key` is written here and read in `src/node/miner.cpp`.
 - `chainman.GetConsensus()` returns the same `Consensus::Params` configured in `src/kernel/chainparams.cpp`.
-- The `chain_active_height` variable is retrieved at the beginning of the block shown, via `WITH_LOCK(cs_main, return chainman.ActiveChain().Height())`.
 
 ---
 

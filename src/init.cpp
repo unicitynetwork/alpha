@@ -1823,54 +1823,50 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
         }
     }
 
-    // !ALPHA SIGNET FORK - Validate signing key at startup (template-serving mode only)
-    if (g_isAlpha) {
+    // !ALPHA SIGNET FORK - Validate signing key at startup
+    // If -signetblockkey is provided, always validate it against the authorized
+    // pubkeys regardless of -server mode or current chain height. This ensures
+    // operators discover misconfiguration immediately, not when the fork activates.
+    // If -signetblockkey is not set, that is fine — the node simply will not
+    // produce blocks.
+    if (g_isAlpha && chainman.GetConsensus().nSignetActivationHeight > 0) {
         const Consensus::Params& forkParams = chainman.GetConsensus();
-        const bool isTemplateMode = args.GetBoolArg("-server", false);
-        const bool forkActive = (forkParams.nSignetActivationHeight > 0) &&
-            (chain_active_height >= forkParams.nSignetActivationHeight);
+        const std::string strKey = args.GetArg("-signetblockkey", "");
 
-        if (isTemplateMode && forkActive) {
-            const std::string strKey = args.GetArg("-signetblockkey", "");
-
-            if (strKey.empty()) {
-                LogPrintf("WARNING: Alpha fork is active but no -signetblockkey configured. "
-                    "Block templates will be unavailable. Add signetblockkey=<WIF> to alpha.conf to enable mining.\n");
-            } else {
-                // Parse the WIF key
-                CKey signingKey = DecodeSecret(strKey);
-                if (!signingKey.IsValid()) {
-                    return InitError(_("Invalid -signetblockkey: failed to decode WIF private key."));
-                }
-
-                // Derive the public key
-                CPubKey signingPubKey = signingKey.GetPubKey();
-                if (!signingKey.VerifyPubKey(signingPubKey)) {
-                    return InitError(_("Invalid -signetblockkey: public key derivation failed."));
-                }
-
-                // Extract authorized pubkeys from the challenge script using shared helper
-                std::vector<CPubKey> authorizedPubkeys = ExtractPubkeysFromChallenge(forkParams.signet_challenge);
-                bool keyAuthorized = false;
-                for (const auto& candidateKey : authorizedPubkeys) {
-                    if (candidateKey == signingPubKey) {
-                        keyAuthorized = true;
-                        break;
-                    }
-                }
-
-                if (!keyAuthorized) {
-                    return InitError(strprintf(
-                        _("Configured -signetblockkey public key (%s) is NOT in the authorized allowlist. "
-                          "The key must correspond to one of the %d authorized pubkeys in the fork challenge script."),
-                        HexStr(signingPubKey), authorizedPubkeys.size()));
-                }
-
-                // Store the validated key globally
-                g_alpha_signet_key = signingKey;
-                LogPrintf("Alpha fork: signing key validated and loaded (pubkey: %s...)\n",
-                    HexStr(signingPubKey).substr(0, 16));
+        if (!strKey.empty()) {
+            // Parse the WIF key
+            CKey signingKey = DecodeSecret(strKey);
+            if (!signingKey.IsValid()) {
+                return InitError(_("Invalid -signetblockkey: failed to decode WIF private key."));
             }
+
+            // Derive the public key
+            CPubKey signingPubKey = signingKey.GetPubKey();
+            if (!signingKey.VerifyPubKey(signingPubKey)) {
+                return InitError(_("Invalid -signetblockkey: public key derivation failed."));
+            }
+
+            // Extract authorized pubkeys from the challenge script using shared helper
+            std::vector<CPubKey> authorizedPubkeys = ExtractPubkeysFromChallenge(forkParams.signet_challenge);
+            bool keyAuthorized = false;
+            for (const auto& candidateKey : authorizedPubkeys) {
+                if (candidateKey == signingPubKey) {
+                    keyAuthorized = true;
+                    break;
+                }
+            }
+
+            if (!keyAuthorized) {
+                return InitError(strprintf(
+                    _("Configured -signetblockkey public key (%s) is NOT in the authorized allowlist. "
+                      "The key must correspond to one of the %d authorized pubkeys in the fork challenge script."),
+                    HexStr(signingPubKey), authorizedPubkeys.size()));
+            }
+
+            // Store the validated key globally
+            g_alpha_signet_key = signingKey;
+            LogPrintf("Alpha fork: signing key validated and loaded (pubkey: %s...)\n",
+                HexStr(signingPubKey).substr(0, 16));
         }
     }
     // !ALPHA SIGNET FORK END
