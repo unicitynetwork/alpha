@@ -841,6 +841,10 @@ static RPCHelpMan getblocktemplate()
 
     // Update nTime
     UpdateTime(pblock, consensusParams, pindexPrev);
+    // Recalculate nBits after time update. When fPowAllowMinDifficultyBlocks
+    // is true the required work depends on the block timestamp, so nBits must
+    // be refreshed whenever nTime changes (e.g. on cached templates).
+    pblock->nBits = GetNextWorkRequired(pindexPrev, pblock, consensusParams);
     pblock->nNonce = 0;
 
     // NOTE: If at some point we support pre-segwit miners post-segwit-activation, this needs to take segwit support into consideration
@@ -961,10 +965,13 @@ static RPCHelpMan getblocktemplate()
     // Post-fork, CreateNewBlock() embeds a SIGNET_HEADER signature in the
     // coinbase witness commitment. External miners must use this coinbase
     // as-is (via BIP22 coinbasetxn) rather than constructing their own.
+    // "data" is the full witness serialization (preserves SIGNET_HEADER).
+    // "txid" is the non-witness hash for the block merkle root.
     if (g_isAlpha && consensusParams.nSignetActivationHeight > 0
         && (pindexPrev->nHeight + 1) >= consensusParams.nSignetActivationHeight) {
         UniValue coinbasetxn(UniValue::VOBJ);
         coinbasetxn.pushKV("data", EncodeHexTx(*pblock->vtx[0]));
+        coinbasetxn.pushKV("txid", pblock->vtx[0]->GetHash().GetHex());
         result.pushKV("coinbasetxn", coinbasetxn);
     }
 

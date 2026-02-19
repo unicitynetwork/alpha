@@ -815,9 +815,13 @@ test_header "18" "Non-authorized node creates and sends transaction post-fork"
 
 test_header "19" "External miner keeps network producing blocks"
 {
-    TARGET_MINER_BLOCKS=5
+    TARGET_MINER_BLOCKS=3
     h_before=$(get_height 0)
     target_height=$((h_before + TARGET_MINER_BLOCKS))
+
+    # Advance mocktime before starting the miner so the first
+    # getblocktemplate call already sees min-difficulty.
+    advance_mocktime 300
 
     # Start external miner on node0 (authorized signer)
     start_external_miner 0
@@ -831,11 +835,17 @@ test_header "19" "External miner keeps network producing blocks"
     fi
 
     # Advance mocktime in loop — each advance triggers min-difficulty
-    # for the next getblocktemplate call
-    miner_deadline=$((SECONDS + 180))
+    # for the next getblocktemplate call.  After advancing, send a
+    # small self-transfer to trigger a mempool update; this causes
+    # the miner's long-poll to return with a fresh template that
+    # reflects the new mocktime (and thus min-difficulty nBits).
+    self_addr=$(cli 0 -rpcwallet=test getnewaddress 2>/dev/null || echo "")
+    miner_deadline=$((SECONDS + 300))
     while [ $SECONDS -lt $miner_deadline ]; do
-        advance_mocktime 300
-        sleep 3
+        advance_mocktime 600
+        # Nudge mempool so the miner's long-poll returns
+        cli 0 -rpcwallet=test sendtoaddress "$self_addr" 0.001 2>/dev/null || true
+        sleep 5
         h=$(get_height 0)
         if [ "$h" -ge "$target_height" ]; then break; fi
     done

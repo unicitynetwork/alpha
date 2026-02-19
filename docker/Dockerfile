@@ -34,6 +34,15 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /miner
 RUN git clone --depth 1 --recursive https://github.com/unicitynetwork/alpha-miner.git . \
+    && sed -i '/if (segwit) {/{N;/calloc(tx_count + 2/s/if (segwit) {/if (segwit \&\& !json_object_get(val, "coinbasetxn")) {/}' cpu-miner.c \
+    && awk '{ \
+        if (match($0, /sha256d\(merkle_tree\[0\], cbtx, cbtx_size\)/)) { \
+            print "\t\t{ json_t *_cbn = json_object_get(val, \"coinbasetxn\");"; \
+            print "\t\tconst char *_tid = _cbn ? json_string_value(json_object_get(_cbn, \"txid\")) : NULL;"; \
+            print "\t\tif (_tid && strlen(_tid) == 64) { hex2bin(merkle_tree[0], _tid, 32); memrev(merkle_tree[0], 32); }"; \
+            print "\t\telse { sha256d(merkle_tree[0], cbtx, cbtx_size); } }"; \
+        } else { print } \
+    }' cpu-miner.c > cpu-miner.c.tmp && mv cpu-miner.c.tmp cpu-miner.c \
     && ./autogen.sh && ./configure && make -j$(nproc) && strip minerd
 
 # Second stage: create minimal runtime image
