@@ -975,7 +975,7 @@ Confirm that the 16-character prefix matches the expected public key of your aut
 
 ### What must happen before mainnet deployment
 
-The current code contains placeholder public keys in `src/kernel/chainparams.cpp`. **These placeholders are not valid compressed public keys and the code will not compile correctly until they are replaced.** The following must be completed before the binary is released:
+The current code contains placeholder public keys in `src/kernel/chainparams.cpp`. **These placeholders are syntactically valid hex strings so the code compiles and links without error, but they are not valid secp256k1 points.** Deploying with placeholder keys will cause the chain to stall at block 450,000 because no valid signature can be produced. The following must be completed before the binary is released:
 
 1. **Generate five key pairs.** Each of the five authorized block producers must generate a fresh key pair on a secure, isolated machine. The private key must be stored securely (hardware wallet, encrypted storage). The compressed public key (33 bytes, 66 hex characters) is the only value that needs to leave the secure environment.
 
@@ -1161,7 +1161,7 @@ The three-way coordination between zero subsidy, difficulty reset, and signet au
 
 2. **~~SIGNET_HEADER duplication~~ FIXED.** The constant `{0xec, 0xc7, 0xda, 0xa2}` is now defined once in `signet.h` as `inline constexpr uint8_t SIGNET_HEADER[4]` and shared by both `signet.cpp` and `miner.cpp`. The previous duplicate `static constexpr` definition in `miner.cpp` has been removed.
 
-3. **`-server` as template-mode proxy.** The startup key check uses `-server` to identify template-serving mode. Nodes running with `-server` but without `-signetblockkey` will start normally post-fork but will be unable to produce block templates (RPC callers will receive an error). Operators who want to mine should configure `-signetblockkey`.
+3. **~~`-server` as template-mode proxy~~ RESOLVED.** The startup key validation no longer gates on `-server` mode or chain height. If `-signetblockkey` is provided, the key is validated unconditionally at startup. If not provided, the node starts normally as a non-mining full node.
 
 4. **~~Hardcoded "5" in error message~~ FIXED.** `init.cpp` now uses `ExtractPubkeysFromChallenge()` to derive the count dynamically from the challenge script.
 
