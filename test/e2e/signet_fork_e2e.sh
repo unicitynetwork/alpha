@@ -2,7 +2,7 @@
 # =============================================================================
 # Alpha Signet Fork — E2E Docker Test Suite
 #
-# Runs 18 tests across 7 Docker containers on alpharegtest to validate
+# Runs 19 tests across 7 Docker containers on alpharegtest to validate
 # pre-fork, fork boundary, and post-fork behavior end-to-end.
 #
 # Mining uses setmocktime to trigger fPowAllowMinDifficultyBlocks, ensuring
@@ -58,7 +58,7 @@ sleep 2
 
 echo ""
 echo -e "${BLUE}========================================${NC}"
-echo -e "${BLUE}  Running E2E Test Suite (18 tests)     ${NC}"
+echo -e "${BLUE}  Running E2E Test Suite (19 tests)     ${NC}"
 echo -e "${BLUE}========================================${NC}"
 
 # =============================================================================
@@ -806,6 +806,104 @@ test_header "18" "Non-authorized node creates and sends transaction post-fork"
         echo "  WARNING: no spendable UTXOs on node0, skipping transaction test"
         TESTS_TOTAL=$((TESTS_TOTAL + 3))
         TESTS_PASSED=$((TESTS_PASSED + 3))
+    fi
+}
+
+# =============================================================================
+# Phase 8: External Mining
+# =============================================================================
+
+test_header "19" "External miner keeps network producing blocks"
+{
+    TARGET_MINER_BLOCKS=5
+    h_before=$(get_height 0)
+    target_height=$((h_before + TARGET_MINER_BLOCKS))
+
+    # Start external miner on node0 (authorized signer)
+    start_external_miner 0
+    sleep 2
+
+    # Verify miner process is running
+    miner_running=$(docker exec "${CONTAINER_PREFIX}0" pgrep -c minerd 2>/dev/null || echo "0")
+    if [ "$miner_running" -eq 0 ]; then
+        echo "  WARNING: minerd failed to start"
+        docker exec "${CONTAINER_PREFIX}0" tail -20 /tmp/minerd.log 2>/dev/null || true
+    fi
+
+    # Advance mocktime in loop — each advance triggers min-difficulty
+    # for the next getblocktemplate call
+    miner_deadline=$((SECONDS + 180))
+    while [ $SECONDS -lt $miner_deadline ]; do
+        advance_mocktime 300
+        sleep 3
+        h=$(get_height 0)
+        if [ "$h" -ge "$target_height" ]; then break; fi
+    done
+
+    stop_external_miner 0
+    sleep 3
+    sync_blocks 60
+
+    h_after=$(get_height 0)
+    actual_mined=$((h_after - h_before))
+
+    # On failure, dump miner logs for debugging
+    if [ "$actual_mined" -lt "$TARGET_MINER_BLOCKS" ]; then
+        echo "  Miner logs (last 30 lines):"
+        docker exec "${CONTAINER_PREFIX}0" tail -30 /tmp/minerd.log 2>/dev/null || true
+    fi
+
+    # Assertion 1: Miner produced enough blocks
+    assert_ge "external miner produced >= ${TARGET_MINER_BLOCKS} blocks" \
+        "$TARGET_MINER_BLOCKS" "$actual_mined" || true
+
+    # Assertion 2: All 7 nodes synced
+    hash0=$(cli 0 getbestblockhash)
+    all_synced=true
+    for i in $(seq 1 $((NUM_NODES - 1))); do
+        hi=$(cli "$i" getbestblockhash)
+        if [ "$hash0" != "$hi" ]; then all_synced=false; fi
+    done
+    TESTS_TOTAL=$((TESTS_TOTAL + 1))
+    if $all_synced; then
+        echo -e "  ${GREEN}PASS${NC}: all 7 nodes synced after external mining"
+        TESTS_PASSED=$((TESTS_PASSED + 1))
+    else
+        echo -e "  ${RED}FAIL${NC}: consensus disagreement after external mining"
+        TESTS_FAILED=$((TESTS_FAILED + 1))
+    fi
+
+    # Assertion 3: All new blocks have zero coinbase
+    all_zero=true
+    for h in $(seq $((h_before + 1)) "$h_after"); do
+        cb=$(get_coinbase_value 0 "$h")
+        if [ "$cb" != "0.00000000" ]; then all_zero=false; fi
+    done
+    TESTS_TOTAL=$((TESTS_TOTAL + 1))
+    if $all_zero; then
+        echo -e "  ${GREEN}PASS${NC}: all externally-mined blocks have zero coinbase"
+        TESTS_PASSED=$((TESTS_PASSED + 1))
+    else
+        echo -e "  ${RED}FAIL${NC}: some blocks have non-zero coinbase"
+        TESTS_FAILED=$((TESTS_FAILED + 1))
+    fi
+
+    # Assertion 4: Blocks contain SIGNET_HEADER (ecc7daa2)
+    all_signed=true
+    for h in $(seq $((h_before + 1)) "$h_after"); do
+        blockhash=$(cli 0 getblockhash "$h")
+        cb_hex=$(cli 0 getblock "$blockhash" 2 | jq -r '.tx[0].hex // empty')
+        if [ -n "$cb_hex" ] && ! echo "$cb_hex" | grep -qi "ecc7daa2"; then
+            all_signed=false
+        fi
+    done
+    TESTS_TOTAL=$((TESTS_TOTAL + 1))
+    if $all_signed; then
+        echo -e "  ${GREEN}PASS${NC}: all blocks have valid signet signatures"
+        TESTS_PASSED=$((TESTS_PASSED + 1))
+    else
+        echo -e "  ${RED}FAIL${NC}: some blocks missing SIGNET_HEADER"
+        TESTS_FAILED=$((TESTS_FAILED + 1))
     fi
 }
 

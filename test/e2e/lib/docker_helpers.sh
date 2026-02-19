@@ -105,3 +105,30 @@ create_test_wallets() {
         cli "$i" createwallet "test" >/dev/null 2>&1 || true
     done
 }
+
+# start_external_miner <node_index>
+# Starts the alpha-miner (minerd) inside the given node's container.
+# The miner uses getblocktemplate/submitblock to produce blocks.
+start_external_miner() {
+    local node=$1
+    local container="${CONTAINER_PREFIX}${node}"
+    local addr
+    addr=$(cli "$node" -rpcwallet=test getnewaddress)
+    docker exec "$container" sh -c "echo '${addr}' > /tmp/miner_addrs.txt"
+    docker exec -d "$container" sh -c "minerd \
+        -o http://127.0.0.1:${RPC_PORT} \
+        -O ${RPC_USER}:${RPC_PASS} \
+        --afile /tmp/miner_addrs.txt \
+        -t 1 --no-affinity \
+        > /tmp/minerd.log 2>&1"
+}
+
+# stop_external_miner <node_index>
+# Stops the alpha-miner inside the given node's container.
+stop_external_miner() {
+    local node=$1
+    local container="${CONTAINER_PREFIX}${node}"
+    docker exec "$container" pkill -f minerd 2>/dev/null || true
+    sleep 1
+    docker exec "$container" pkill -9 -f minerd 2>/dev/null || true
+}

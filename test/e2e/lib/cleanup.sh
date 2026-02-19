@@ -4,6 +4,11 @@
 cleanup() {
     echo -e "${YELLOW}Cleaning up...${NC}"
 
+    # Stop any running external miners before removing containers
+    for i in $(seq 0 $((NUM_NODES - 1))); do
+        docker exec "${CONTAINER_PREFIX}${i}" pkill -f minerd 2>/dev/null || true
+    done
+
     # Stop and remove all test containers
     for i in $(seq 0 $((NUM_NODES - 1))); do
         docker rm -f "${CONTAINER_PREFIX}${i}" 2>/dev/null || true

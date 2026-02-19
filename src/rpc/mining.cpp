@@ -956,6 +956,18 @@ static RPCHelpMan getblocktemplate()
     result.pushKV("transactions", transactions);
     result.pushKV("coinbaseaux", aux);
     result.pushKV("coinbasevalue", (int64_t)pblock->vtx[0]->vout[0].nValue);
+
+    // !ALPHA SIGNET FORK - Include pre-signed coinbase for external miners.
+    // Post-fork, CreateNewBlock() embeds a SIGNET_HEADER signature in the
+    // coinbase witness commitment. External miners must use this coinbase
+    // as-is (via BIP22 coinbasetxn) rather than constructing their own.
+    if (g_isAlpha && consensusParams.nSignetActivationHeight > 0
+        && (pindexPrev->nHeight + 1) >= consensusParams.nSignetActivationHeight) {
+        UniValue coinbasetxn(UniValue::VOBJ);
+        coinbasetxn.pushKV("data", EncodeHexTx(*pblock->vtx[0]));
+        result.pushKV("coinbasetxn", coinbasetxn);
+    }
+
     result.pushKV("longpollid", active_chain.Tip()->GetBlockHash().GetHex() + ToString(nTransactionsUpdatedLast));
     result.pushKV("target", hashTarget.GetHex());
     result.pushKV("mintime", (int64_t)pindexPrev->GetMedianTimePast()+1);

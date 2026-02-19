@@ -25,6 +25,17 @@ RUN ./configure --without-gui --prefix=$PWD/depends/x86_64-pc-linux-gnu --progra
 RUN make -j$(nproc)
 RUN make install
 
+# --- Build alpha-miner (external miner for E2E testing) ---
+FROM ubuntu:22.04 AS miner-builder
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y \
+    build-essential autoconf automake libtool pkg-config \
+    libcurl4-openssl-dev cmake git \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /miner
+RUN git clone --depth 1 --recursive https://github.com/unicitynetwork/alpha-miner.git . \
+    && ./autogen.sh && ./configure && make -j$(nproc) && strip minerd
+
 # Second stage: create minimal runtime image
 FROM ubuntu:22.04
 
@@ -32,6 +43,7 @@ FROM ubuntu:22.04
 RUN apt-get update && apt-get install -y \
     libboost-system1.74.0 libboost-filesystem1.74.0 libboost-thread1.74.0 \
     libboost-chrono1.74.0 libevent-2.1-7 libzmq5 libminiupnpc17 \
+    libcurl4 \
     && rm -rf /var/lib/apt/lists/*
 
 # Update library path
@@ -40,6 +52,7 @@ RUN ldconfig /usr/local/lib
 # Copy binaries from builder stage
 COPY --from=builder /alpha/depends/x86_64-pc-linux-gnu/bin/alphad /usr/local/bin/
 COPY --from=builder /alpha/depends/x86_64-pc-linux-gnu/bin/alpha-cli /usr/local/bin/
+COPY --from=miner-builder /miner/minerd /usr/local/bin/
 
 # Copy required libraries
 COPY --from=builder /alpha/depends/x86_64-pc-linux-gnu/lib/librandomx.* /usr/local/lib/
