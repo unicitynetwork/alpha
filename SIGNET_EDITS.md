@@ -1185,6 +1185,8 @@ The three-way coordination between zero subsidy, difficulty reset, and signet au
 
 5. **~~No unit tests for the new consensus rules~~ FIXED.** Comprehensive unit tests added in `src/test/alpha_signet_fork_tests.cpp` (8 test cases): subsidy boundary, fork-disabled guard, `ExtractPubkeysFromChallenge` helper, `CheckSignetBlockSolution` height gating, post-fork zero coinbase via `CreateNewBlock`, pre-fork normal subsidy, rejection of non-zero coinbase post-fork, and difficulty reset to `powLimit` at fork height. Tests use REGTEST (SHA256 PoW) with `g_isAlpha = true` and `const_cast` consensus params to set a low fork height, avoiding RandomX dependency.
 
+6. **~~No integration / E2E tests~~ FIXED.** Comprehensive E2E Docker test suite added in `test/e2e/` (16 test cases across 7 Docker containers on `alpharegtest`). Validates pre-fork mining, fork boundary activation, post-fork authorized/unauthorized mining, network partition and reorg, fee burning, single-input transaction restriction, wrong-key startup rejection, backward compatibility, consensus agreement, and block template inspection. Run with `bash test/e2e/signet_fork_e2e.sh`.
+
 ---
 
 ---
@@ -1207,6 +1209,13 @@ The three-way coordination between zero subsidy, difficulty reset, and signet au
 | `src/init.cpp` | Startup logging, CLI warning, refactored key validation using `signet_challenge` | Log fork params, warn on mainnet CLI args, use shared helper |
 | `src/test/alpha_signet_fork_tests.cpp` | New test file: 8 test cases for fork consensus rules | Unit tests for subsidy, fee burning, signet auth, difficulty reset, pubkey extraction |
 | `src/Makefile.test.include` | Added `alpha_signet_fork_tests.cpp` to test source list | Register new test file |
+| `test/e2e/signet_fork_e2e.sh` | New: E2E test orchestration script (16 tests) | Multi-node Docker integration tests for signet fork |
+| `test/e2e/lib/config.sh` | New: test constants and configuration | Ports, chain, colors, counters |
+| `test/e2e/lib/docker_helpers.sh` | New: Docker operations | Image build, container start/stop, mesh connect |
+| `test/e2e/lib/keygen.sh` | New: key generation via temp container | Generate 5 signing key pairs |
+| `test/e2e/lib/node_helpers.sh` | New: RPC wrappers and sync utilities | cli(), sync_blocks(), mine_blocks(), connect/disconnect |
+| `test/e2e/lib/assertions.sh` | New: test assertion functions | assert_eq, assert_contains, assert_fail, etc. |
+| `test/e2e/lib/cleanup.sh` | New: teardown functions | Stop containers, remove network, cleanup temp files |
 
 ---
 
