@@ -24,6 +24,8 @@ write_node_config() {
 
     cat > "${conf_dir}/alpha.conf" <<CONFEOF
 chain=${CHAIN}
+
+[${CHAIN}]
 server=1
 port=${P2P_PORT}
 rpcport=${RPC_PORT}

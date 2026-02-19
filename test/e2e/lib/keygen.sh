@@ -10,6 +10,8 @@ generate_keys() {
 
     cat > "${keygen_conf_dir}/alpha.conf" <<CONFEOF
 chain=${CHAIN}
+
+[${CHAIN}]
 server=1
 port=${P2P_PORT}
 rpcport=${RPC_PORT}
@@ -19,6 +21,7 @@ rpcallowip=0.0.0.0/0
 rpcbind=0.0.0.0
 listen=0
 randomxfastmode=1
+deprecatedrpc=create_bdb
 CONFEOF
 
     # Start temporary keygen container

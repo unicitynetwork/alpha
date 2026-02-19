@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # RPC wrappers and node helper functions
 
+# Global mock time tracker (seconds since epoch)
+MOCK_TIME=0
+
 # cli <node_index> <rpc_command> [args...]
 cli() {
     local node=$1; shift
@@ -32,6 +35,37 @@ get_height() {
 # get_best_hash <node_index>
 get_best_hash() {
     cli "$1" getbestblockhash
+}
+
+# advance_mocktime <seconds_to_add>
+# Advances the mock time on ALL nodes to trigger min-difficulty mining.
+# alpharegtest uses fPowAllowMinDifficultyBlocks=true, so if a block's
+# timestamp is > prev_block_time + 2*target_spacing (4 min), difficulty
+# drops to powLimit (trivially easy). We advance by 5 minutes per call.
+advance_mocktime() {
+    local delta=${1:-300}
+    if [ "$MOCK_TIME" -eq 0 ]; then
+        # Initialize from current real time
+        MOCK_TIME=$(date +%s)
+    fi
+    MOCK_TIME=$((MOCK_TIME + delta))
+    for i in $(seq 0 $((NUM_NODES - 1))); do
+        cli "$i" setmocktime "$MOCK_TIME" 2>/dev/null || true
+    done
+}
+
+# advance_mocktime_nodes <seconds_to_add> <node_indices...>
+# Advances mock time on specific nodes only
+advance_mocktime_nodes() {
+    local delta=$1; shift
+    local nodes=("$@")
+    if [ "$MOCK_TIME" -eq 0 ]; then
+        MOCK_TIME=$(date +%s)
+    fi
+    MOCK_TIME=$((MOCK_TIME + delta))
+    for i in "${nodes[@]}"; do
+        cli "$i" setmocktime "$MOCK_TIME" 2>/dev/null || true
+    done
 }
 
 # sync_blocks <timeout_seconds>
@@ -98,20 +132,25 @@ get_coinbase_value() {
     blockhash=$(cli "$node" getblockhash "$height")
     local block_json
     block_json=$(cli "$node" getblock "$blockhash" 2)
-    echo "$block_json" | jq -r '.tx[0].vout[0].value'
+    # jq returns 0E-8 for zero values; normalize to fixed decimal
+    echo "$block_json" | jq -r '.tx[0].vout[0].value' | awk '{printf "%.8f\n", $1}'
 }
 
 # mine_blocks <node_index> <count> [address]
-# Mines blocks and returns the block hashes
+# Mines blocks using mocktime to trigger min-difficulty.
+# Each block advances mocktime by 5 minutes so fPowAllowMinDifficultyBlocks kicks in.
 mine_blocks() {
     local node=$1
     local count=$2
     local addr=${3:-$(cli "$node" getnewaddress 2>/dev/null || echo "")}
     if [ -z "$addr" ]; then
-        # If no wallet, use a dummy address (just need a valid one)
         addr=$(cli 0 getnewaddress 2>/dev/null || echo "ralpha1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6ayzv5")
     fi
-    cli "$node" generatetoaddress "$count" "$addr"
+    # Mine blocks one at a time, advancing mocktime for each
+    for _block_i in $(seq 1 "$count"); do
+        advance_mocktime 300
+        cli "$node" generatetoaddress 1 "$addr" >/dev/null
+    done
 }
 
 # connect_nodes <from_node> <to_node>
