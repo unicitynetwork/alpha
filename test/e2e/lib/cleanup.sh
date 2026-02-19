@@ -13,9 +13,10 @@ cleanup() {
     for i in $(seq 0 $((NUM_NODES - 1))); do
         docker rm -f "${CONTAINER_PREFIX}${i}" 2>/dev/null || true
     done
-    # Also remove extra containers from edge-case tests (nodes 7, 8)
+    # Also remove extra containers from edge-case tests (nodes 7, 8, 9)
     docker rm -f "${CONTAINER_PREFIX}7" 2>/dev/null || true
     docker rm -f "${CONTAINER_PREFIX}8" 2>/dev/null || true
+    docker rm -f "${CONTAINER_PREFIX}9" 2>/dev/null || true
     # Remove the keygen container
     docker rm -f "alpha-e2e-keygen" 2>/dev/null || true
 

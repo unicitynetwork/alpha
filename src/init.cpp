@@ -96,8 +96,10 @@
 // !SCASH END
 
 // !ALPHA SIGNET FORK
+#include <addresstype.h>
 #include <key.h>
 #include <key_io.h>
+#include <node/mining_thread.h>
 #include <script/script.h>
 #include <signet.h>
 // !ALPHA SIGNET FORK END
@@ -303,6 +305,13 @@ void Shutdown(NodeContext& node)
         client->flush();
     }
     StopMapPort();
+
+    // !ALPHA INTEGRATED MINING
+    if (node.mining_ctx) {
+        node.mining_ctx->Stop();
+        node.mining_ctx.reset();
+    }
+    // !ALPHA INTEGRATED MINING END
 
     // Because these depend on each-other, we make sure that neither can be
     // using the other before destroying them.
@@ -697,6 +706,12 @@ void SetupServerArgs(ArgsManager& argsman)
         "MUST be set in alpha.conf, not on the command line.",
         ArgsManager::ALLOW_ANY | ArgsManager::SENSITIVE, OptionsCategory::BLOCK_CREATION);
     // !ALPHA SIGNET FORK END
+
+    // !ALPHA INTEGRATED MINING
+    argsman.AddArg("-mine", "Enable continuous background mining (default: false)", ArgsManager::ALLOW_ANY, OptionsCategory::BLOCK_CREATION);
+    argsman.AddArg("-mineaddress=<addr>", "Address for mining coinbase output (required when -mine is set)", ArgsManager::ALLOW_ANY, OptionsCategory::BLOCK_CREATION);
+    argsman.AddArg("-minethreads=<n>", "Number of mining threads (default: 1)", ArgsManager::ALLOW_ANY, OptionsCategory::BLOCK_CREATION);
+    // !ALPHA INTEGRATED MINING END
 
     argsman.AddArg("-rest", strprintf("Accept public REST requests (default: %u)", DEFAULT_REST_ENABLE), ArgsManager::ALLOW_ANY, OptionsCategory::RPC);
     argsman.AddArg("-rpcallowip=<ip>", "Allow JSON-RPC connections from specified source. Valid values for <ip> are a single IP (e.g. 1.2.3.4), a network/netmask (e.g. 1.2.3.4/255.255.255.0), a network/CIDR (e.g. 1.2.3.4/24), all ipv4 (0.0.0.0/0), or all ipv6 (::/0). This option can be specified multiple times", ArgsManager::ALLOW_ANY, OptionsCategory::RPC);
@@ -2132,6 +2147,24 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
 #if HAVE_SYSTEM
     StartupNotify(args);
 #endif
+
+    // !ALPHA INTEGRATED MINING
+    if (args.GetBoolArg("-mine", false)) {
+        std::string mine_addr = args.GetArg("-mineaddress", "");
+        if (mine_addr.empty()) {
+            return InitError(Untranslated("-mine requires -mineaddress=<addr>"));
+        }
+        CTxDestination dest = DecodeDestination(mine_addr);
+        if (!IsValidDestination(dest)) {
+            return InitError(strprintf(Untranslated("Invalid -mineaddress: %s"), mine_addr));
+        }
+
+        node.mining_ctx = std::make_unique<node::MiningContext>();
+        node.mining_ctx->coinbase_script = GetScriptForDestination(dest);
+        node.mining_ctx->num_threads = args.GetIntArg("-minethreads", 1);
+        node.mining_ctx->Start(*node.chainman, *node.mempool);
+    }
+    // !ALPHA INTEGRATED MINING END
 
     return true;
 }

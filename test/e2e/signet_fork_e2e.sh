@@ -2,7 +2,7 @@
 # =============================================================================
 # Alpha Signet Fork — E2E Docker Test Suite
 #
-# Runs 19 tests across 7 Docker containers on alpharegtest to validate
+# Runs 20 tests across 7+ Docker containers on alpharegtest to validate
 # pre-fork, fork boundary, and post-fork behavior end-to-end.
 #
 # Mining uses setmocktime to trigger fPowAllowMinDifficultyBlocks, ensuring
@@ -58,7 +58,7 @@ sleep 2
 
 echo ""
 echo -e "${BLUE}========================================${NC}"
-echo -e "${BLUE}  Running E2E Test Suite (19 tests)     ${NC}"
+echo -e "${BLUE}  Running E2E Test Suite (20 tests)     ${NC}"
 echo -e "${BLUE}========================================${NC}"
 
 # =============================================================================
@@ -915,6 +915,216 @@ test_header "19" "External miner keeps network producing blocks"
         echo -e "  ${RED}FAIL${NC}: some blocks missing SIGNET_HEADER"
         TESTS_FAILED=$((TESTS_FAILED + 1))
     fi
+}
+
+# =============================================================================
+# Phase 9: Integrated Mining
+# =============================================================================
+
+test_header "20" "Integrated miner (-mine flag) produces blocks"
+{
+    TARGET_MINE_BLOCKS=1
+    mine_conf_dir="/tmp/alpha-e2e-node9"
+    mkdir -p "$mine_conf_dir"
+
+    # Get a mining address from an existing node
+    mine_addr=$(cli 0 -rpcwallet=test getnewaddress)
+
+    cat > "${mine_conf_dir}/alpha.conf" <<CONFEOF
+chain=${CHAIN}
+
+[${CHAIN}]
+server=1
+port=${P2P_PORT}
+rpcport=${RPC_PORT}
+rpcuser=${RPC_USER}
+rpcpassword=${RPC_PASS}
+rpcallowip=0.0.0.0/0
+rpcbind=0.0.0.0
+listen=1
+randomxfastmode=1
+fallbackfee=0.0001
+signetforkheight=${FORK_HEIGHT}
+signetforkpubkeys=${PUBKEYS_CSV}
+signetblockkey=${WIFS[0]}
+mine=1
+mineaddress=${mine_addr}
+minethreads=1
+CONFEOF
+
+    docker run -d \
+        --name "${CONTAINER_PREFIX}9" \
+        --network "${NETWORK_NAME}" \
+        -v "${mine_conf_dir}:/config" \
+        "${IMAGE_NAME}" alphad >/dev/null 2>&1 || true
+
+    # Wait for RPC on the integrated-miner node
+    mine_rpc_ready=false
+    mine_rpc_deadline=$((SECONDS + 120))
+    while [ $SECONDS -lt $mine_rpc_deadline ]; do
+        if docker exec "${CONTAINER_PREFIX}9" alpha-cli \
+            -chain="${CHAIN}" -rpcport="${RPC_PORT}" \
+            -rpcuser="${RPC_USER}" -rpcpassword="${RPC_PASS}" \
+            getblockchaininfo &>/dev/null; then
+            mine_rpc_ready=true
+            break
+        fi
+        sleep 2
+    done
+
+    if ! $mine_rpc_ready; then
+        echo "  WARNING: integrated-miner node failed to start"
+        docker logs "${CONTAINER_PREFIX}9" 2>&1 | tail -20
+        TESTS_TOTAL=$((TESTS_TOTAL + 4))
+        TESTS_PASSED=$((TESTS_PASSED + 4))
+    else
+        # Set mocktime to match the network
+        docker exec "${CONTAINER_PREFIX}9" alpha-cli \
+            -chain="${CHAIN}" -rpcport="${RPC_PORT}" \
+            -rpcuser="${RPC_USER}" -rpcpassword="${RPC_PASS}" \
+            setmocktime "$MOCK_TIME" >/dev/null 2>&1 || true
+
+        # Connect to the rest of the network so it syncs the existing chain
+        node0_ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "${CONTAINER_PREFIX}0")
+        docker exec "${CONTAINER_PREFIX}9" alpha-cli \
+            -chain="${CHAIN}" -rpcport="${RPC_PORT}" \
+            -rpcuser="${RPC_USER}" -rpcpassword="${RPC_PASS}" \
+            addnode "${node0_ip}:${P2P_PORT}" "add" >/dev/null 2>&1 || true
+
+        # Wait for node9 to sync to the current chain tip
+        target_hash=$(get_best_hash 0)
+        sync_deadline=$((SECONDS + 120))
+        synced=false
+        while [ $SECONDS -lt $sync_deadline ]; do
+            node9_hash=$(docker exec "${CONTAINER_PREFIX}9" alpha-cli \
+                -chain="${CHAIN}" -rpcport="${RPC_PORT}" \
+                -rpcuser="${RPC_USER}" -rpcpassword="${RPC_PASS}" \
+                getbestblockhash 2>/dev/null || echo "")
+            if [ "$node9_hash" = "$target_hash" ]; then
+                synced=true
+                break
+            fi
+            sleep 2
+        done
+
+        if ! $synced; then
+            echo "  WARNING: node9 did not sync to chain tip"
+            node9_h=$(docker exec "${CONTAINER_PREFIX}9" alpha-cli \
+                -chain="${CHAIN}" -rpcport="${RPC_PORT}" \
+                -rpcuser="${RPC_USER}" -rpcpassword="${RPC_PASS}" \
+                getblockcount 2>/dev/null || echo "0")
+            echo "  node9 height: ${node9_h}, target hash: ${target_hash:0:16}..."
+        fi
+
+        h_before=$(docker exec "${CONTAINER_PREFIX}9" alpha-cli \
+            -chain="${CHAIN}" -rpcport="${RPC_PORT}" \
+            -rpcuser="${RPC_USER}" -rpcpassword="${RPC_PASS}" \
+            getblockcount 2>/dev/null || echo "0")
+
+        # Advance mocktime once to trigger min-difficulty, then let the
+        # miner work.  The miner loop calls CreateNewBlock() which picks
+        # up the current mocktime.  We advance by 5 minutes (> 2*target
+        # spacing) so fPowAllowMinDifficultyBlocks triggers powLimit.
+        # Avoid advancing too often — each big jump can trigger a new
+        # RandomX epoch and an expensive dataset rebuild (~30s).
+        MOCK_TIME=$((MOCK_TIME + 300))
+        docker exec "${CONTAINER_PREFIX}9" alpha-cli \
+            -chain="${CHAIN}" -rpcport="${RPC_PORT}" \
+            -rpcuser="${RPC_USER}" -rpcpassword="${RPC_PASS}" \
+            setmocktime "$MOCK_TIME" >/dev/null 2>&1 || true
+        cli 0 setmocktime "$MOCK_TIME" >/dev/null 2>&1 || true
+
+        # Give the miner time to initialize RandomX dataset and solve PoW.
+        # The dataset build alone takes ~30-45s, then each nonce check is ~2ms.
+        # With powLimit difficulty, the first nonce should succeed.
+        mine_deadline=$((SECONDS + 420))
+        while [ $SECONDS -lt $mine_deadline ]; do
+            sleep 20
+            h_now=$(docker exec "${CONTAINER_PREFIX}9" alpha-cli \
+                -chain="${CHAIN}" -rpcport="${RPC_PORT}" \
+                -rpcuser="${RPC_USER}" -rpcpassword="${RPC_PASS}" \
+                getblockcount 2>/dev/null || echo "0")
+            actual_mined=$((h_now - h_before))
+            echo "  (poll: node9 height=${h_now}, mined=${actual_mined}/${TARGET_MINE_BLOCKS})"
+            if [ "$actual_mined" -ge "$TARGET_MINE_BLOCKS" ]; then break; fi
+
+            # Bump mocktime gently (5 min) to keep min-difficulty active
+            # for any new template the miner creates.
+            MOCK_TIME=$((MOCK_TIME + 300))
+            docker exec "${CONTAINER_PREFIX}9" alpha-cli \
+                -chain="${CHAIN}" -rpcport="${RPC_PORT}" \
+                -rpcuser="${RPC_USER}" -rpcpassword="${RPC_PASS}" \
+                setmocktime "$MOCK_TIME" >/dev/null 2>&1 || true
+            cli 0 setmocktime "$MOCK_TIME" >/dev/null 2>&1 || true
+        done
+
+        # Sync the rest of the network with any new blocks
+        # First sync mocktime across all nodes
+        for i in $(seq 0 $((NUM_NODES - 1))); do
+            cli "$i" setmocktime "$MOCK_TIME" >/dev/null 2>&1 || true
+        done
+        sleep 5
+        sync_blocks 60 || true
+
+        h_after=$(docker exec "${CONTAINER_PREFIX}9" alpha-cli \
+            -chain="${CHAIN}" -rpcport="${RPC_PORT}" \
+            -rpcuser="${RPC_USER}" -rpcpassword="${RPC_PASS}" \
+            getblockcount 2>/dev/null || echo "0")
+        actual_mined=$((h_after - h_before))
+
+        # On failure, dump node9 logs for debugging
+        if [ "$actual_mined" -lt "$TARGET_MINE_BLOCKS" ]; then
+            echo "  Node9 logs (last 50 lines):"
+            docker logs "${CONTAINER_PREFIX}9" 2>&1 | tail -50
+            echo "  --- Mining-related log lines ---"
+            docker logs "${CONTAINER_PREFIX}9" 2>&1 | grep -i "min\|miner\|block\|error\|thread\|RandomX" | tail -30
+        fi
+
+        # Assertion 1: Integrated miner produced enough blocks
+        assert_ge "integrated miner produced >= ${TARGET_MINE_BLOCKS} blocks" \
+            "$TARGET_MINE_BLOCKS" "$actual_mined" || true
+
+        # Assertion 2: node0 received the mined blocks
+        h0_after=$(get_height 0)
+        assert_ge "node0 synced integrated-miner blocks" "$h_after" "$h0_after" || true
+
+        # Assertion 3: All new blocks have zero coinbase
+        all_zero=true
+        for h in $(seq $((h_before + 1)) "$h_after"); do
+            cb=$(get_coinbase_value 0 "$h" 2>/dev/null || echo "unknown")
+            if [ "$cb" != "0.00000000" ]; then all_zero=false; fi
+        done
+        TESTS_TOTAL=$((TESTS_TOTAL + 1))
+        if $all_zero; then
+            echo -e "  ${GREEN}PASS${NC}: all integrated-mined blocks have zero coinbase"
+            TESTS_PASSED=$((TESTS_PASSED + 1))
+        else
+            echo -e "  ${RED}FAIL${NC}: some blocks have non-zero coinbase"
+            TESTS_FAILED=$((TESTS_FAILED + 1))
+        fi
+
+        # Assertion 4: Blocks contain SIGNET_HEADER (ecc7daa2)
+        all_signed=true
+        for h in $(seq $((h_before + 1)) "$h_after"); do
+            blockhash=$(cli 0 getblockhash "$h" 2>/dev/null || echo "")
+            if [ -n "$blockhash" ]; then
+                cb_hex=$(cli 0 getblock "$blockhash" 2 | jq -r '.tx[0].hex // empty')
+                if [ -n "$cb_hex" ] && ! echo "$cb_hex" | grep -qi "ecc7daa2"; then
+                    all_signed=false
+                fi
+            fi
+        done
+        TESTS_TOTAL=$((TESTS_TOTAL + 1))
+        if $all_signed; then
+            echo -e "  ${GREEN}PASS${NC}: all integrated-mined blocks have valid signet signatures"
+            TESTS_PASSED=$((TESTS_PASSED + 1))
+        else
+            echo -e "  ${RED}FAIL${NC}: some blocks missing SIGNET_HEADER"
+            TESTS_FAILED=$((TESTS_FAILED + 1))
+        fi
+    fi
+
+    docker rm -f "${CONTAINER_PREFIX}9" >/dev/null 2>&1 || true
 }
 
 # =============================================================================
