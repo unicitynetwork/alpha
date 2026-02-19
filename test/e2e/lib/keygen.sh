@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Key generation: produces 5 key pairs using a temporary alphad container
+# Key generation: produces 6 key pairs (5 authorized + 1 unauthorized) using a temporary alphad container
 
 generate_keys() {
-    echo -e "${BLUE}Generating 5 signing key pairs...${NC}"
+    echo -e "${BLUE}Generating 5 signing key pairs + 1 unauthorized test key...${NC}"
 
     local keygen_container="alpha-e2e-keygen"
     local keygen_conf_dir="/tmp/alpha-e2e-keygen-conf"
@@ -49,10 +49,10 @@ CONFEOF
         -rpcuser="${RPC_USER}" -rpcpassword="${RPC_PASS}" \
         createwallet "keygen" false false "" false false >/dev/null
 
-    # Generate 5 key pairs
+    # Generate 6 key pairs (5 authorized + 1 unauthorized for testing)
     PUBKEYS=()
     WIFS=()
-    for i in $(seq 0 4); do
+    for i in $(seq 0 5); do
         local addr
         addr=$(docker exec "$keygen_container" alpha-cli \
             -chain="${CHAIN}" -rpcport="${RPC_PORT}" \
@@ -79,8 +79,11 @@ CONFEOF
         echo "  Key ${i}: pubkey=${pubkey:0:16}..."
     done
 
-    # Build comma-separated pubkey list
-    PUBKEYS_CSV=$(IFS=,; echo "${PUBKEYS[*]}")
+    # Save the 6th key as the unauthorized test key
+    WRONG_WIF="${WIFS[5]}"
+
+    # Build comma-separated pubkey list using only the first 5 (authorized) keys
+    PUBKEYS_CSV=$(IFS=,; echo "${PUBKEYS[*]:0:5}")
 
     # Stop and remove keygen container
     docker rm -f "$keygen_container" >/dev/null 2>&1 || true
