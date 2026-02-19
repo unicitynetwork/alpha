@@ -309,6 +309,29 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
     // Use ASERT DAA if activated, otherwise use legacy Bitcoin DAA
     if (params.asertAnchorParams) {
         if (pindexLast->nHeight + 1 >= params.nASERTActivationHeight) {
+            // !ALPHA SIGNET FORK - Use fork block as new ASERT anchor post-fork
+            // After the signet fork, ASERT must anchor from the fork block (which
+            // reset difficulty to powLimit) rather than the original anchor at
+            // block 70232, otherwise ASERT computes an astronomically high difficulty.
+            if (g_isAlpha && params.nSignetActivationHeight > 0 && pindexLast->nHeight + 1 > params.nSignetActivationHeight) {
+                // Walk back to the fork block to get its timestamp
+                const CBlockIndex* pForkBlock = pindexLast;
+                while (pForkBlock && pForkBlock->nHeight > params.nSignetActivationHeight) {
+                    pForkBlock = pForkBlock->pprev;
+                }
+                if (pForkBlock && pForkBlock->nHeight == params.nSignetActivationHeight) {
+                    // Use the fork block as the ASERT anchor: its nBits is powLimit,
+                    // and its prev block's timestamp is the anchor timestamp
+                    const CBlockIndex* pForkPrev = pForkBlock->pprev;
+                    Consensus::Params::ASERTAnchor forkAnchor{
+                        params.nSignetActivationHeight,   // anchor height
+                        nProofOfWorkLimit,                // anchor nBits (powLimit)
+                        pForkPrev ? pForkPrev->GetBlockTime() : pForkBlock->GetBlockTime(),
+                    };
+                    return GetNextASERTWorkRequired(pindexLast, pblock, params, forkAnchor);
+                }
+            }
+            // !ALPHA SIGNET FORK END
             return GetNextASERTWorkRequired(pindexLast, pblock, params, *params.asertAnchorParams);
         }
     }
