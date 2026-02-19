@@ -207,6 +207,26 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
         const CScript challenge(cparams.signet_challenge.begin(),
                                cparams.signet_challenge.end());
 
+        int commitpos = GetWitnessCommitmentIndex(*pblock);
+        if (commitpos == NO_WITNESS_COMMITMENT) {
+            throw std::runtime_error(strprintf(
+                "%s: No witness commitment in block for signet signing at height %d", __func__, nHeight));
+        }
+
+        // Add an empty 4-byte SIGNET_HEADER placeholder to the coinbase
+        // witness commitment output BEFORE computing the signet merkle root.
+        // During verification, FetchAndClearCommitmentSection strips the
+        // solution but leaves this 4-byte placeholder, so the signing and
+        // verification merkle roots must both include it.
+        CScript savedScriptPubKey;
+        {
+            CMutableTransaction mtx(*pblock->vtx[0]);
+            savedScriptPubKey = mtx.vout[commitpos].scriptPubKey;
+            std::vector<uint8_t> empty_header(std::begin(SIGNET_HEADER), std::end(SIGNET_HEADER));
+            mtx.vout[commitpos].scriptPubKey << empty_header;
+            pblock->vtx[0] = MakeTransactionRef(std::move(mtx));
+        }
+
         // Create the signet signing transaction pair
         const std::optional<SignetTxs> signet_txs = SignetTxs::Create(*pblock, challenge);
         if (!signet_txs) {
@@ -240,15 +260,11 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
         writer << tx_signing.vin[0].scriptSig;
         writer << tx_signing.vin[0].scriptWitness.stack;
 
-        // Append SIGNET_HEADER + solution to witness commitment output
-        // SIGNET_HEADER is defined in signet.h
-        int commitpos = GetWitnessCommitmentIndex(*pblock);
-        if (commitpos == NO_WITNESS_COMMITMENT) {
-            throw std::runtime_error(strprintf(
-                "%s: No witness commitment in block for signet signing at height %d", __func__, nHeight));
-        }
-
+        // Replace the placeholder with the full SIGNET_HEADER + solution.
+        // Restore the original scriptPubKey (without placeholder) then append
+        // the complete signet commitment pushdata.
         CMutableTransaction mtx_coinbase(*pblock->vtx[0]);
+        mtx_coinbase.vout[commitpos].scriptPubKey = savedScriptPubKey;
         std::vector<uint8_t> pushdata;
         pushdata.insert(pushdata.end(), std::begin(SIGNET_HEADER), std::end(SIGNET_HEADER));
         pushdata.insert(pushdata.end(), signet_solution.begin(), signet_solution.end());

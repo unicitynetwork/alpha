@@ -459,6 +459,26 @@ This change ensures that the block template itself is created with a zero-value 
 +        const CScript challenge(cparams.signet_challenge.begin(),
 +                               cparams.signet_challenge.end());
 +
++        int commitpos = GetWitnessCommitmentIndex(*pblock);
++        if (commitpos == NO_WITNESS_COMMITMENT) {
++            throw std::runtime_error(strprintf(
++                "%s: No witness commitment in block for signet signing at height %d", __func__, nHeight));
++        }
++
++        // Add an empty 4-byte SIGNET_HEADER placeholder to the coinbase
++        // witness commitment output BEFORE computing the signet merkle root.
++        // During verification, FetchAndClearCommitmentSection strips the
++        // solution but leaves this 4-byte placeholder, so the signing and
++        // verification merkle roots must both include it.
++        CScript savedScriptPubKey;
++        {
++            CMutableTransaction mtx(*pblock->vtx[0]);
++            savedScriptPubKey = mtx.vout[commitpos].scriptPubKey;
++            std::vector<uint8_t> empty_header(std::begin(SIGNET_HEADER), std::end(SIGNET_HEADER));
++            mtx.vout[commitpos].scriptPubKey << empty_header;
++            pblock->vtx[0] = MakeTransactionRef(std::move(mtx));
++        }
++
 +        // Create the signet signing transaction pair
 +        const std::optional<SignetTxs> signet_txs = SignetTxs::Create(*pblock, challenge);
 +        if (!signet_txs) {
@@ -492,15 +512,11 @@ This change ensures that the block template itself is created with a zero-value 
 +        writer << tx_signing.vin[0].scriptSig;
 +        writer << tx_signing.vin[0].scriptWitness.stack;
 +
-+        // Append SIGNET_HEADER + solution to witness commitment output
-+        // SIGNET_HEADER is defined in signet.h
-+        int commitpos = GetWitnessCommitmentIndex(*pblock);
-+        if (commitpos == NO_WITNESS_COMMITMENT) {
-+            throw std::runtime_error(strprintf(
-+                "%s: No witness commitment in block for signet signing at height %d", __func__, nHeight));
-+        }
-+
++        // Replace the placeholder with the full SIGNET_HEADER + solution.
++        // Restore the original scriptPubKey (without placeholder) then append
++        // the complete signet commitment pushdata.
 +        CMutableTransaction mtx_coinbase(*pblock->vtx[0]);
++        mtx_coinbase.vout[commitpos].scriptPubKey = savedScriptPubKey;
 +        std::vector<uint8_t> pushdata;
 +        pushdata.insert(pushdata.end(), std::begin(SIGNET_HEADER), std::end(SIGNET_HEADER));
 +        pushdata.insert(pushdata.end(), signet_solution.begin(), signet_solution.end());
@@ -528,21 +544,23 @@ This ordering is required because `SignetTxs::Create` reads the block's witness 
 
 2. **Challenge construction** -- `cparams.signet_challenge` is the same field set in `chainparams.cpp` via `consensus.signet_challenge = ParseHex(...)`. Because `signet_blocks = false` on Alpha chains, the native BIP325 checker never reads this field; the signing code here is the only consumer on Alpha chains.
 
-3. **`SignetTxs::Create(*pblock, challenge)`** -- When called during signing, the block's coinbase will have a witness commitment but no `SIGNET_HEADER` section yet. In this case `FetchAndClearCommitmentSection` does not find the header, `signet_solution` remains empty, and `tx_spending.vin[0].scriptSig` and `witness.stack` are both empty. The signing transaction pair is constructed with an empty spending input, which is what will be signed.
+3. **SIGNET_HEADER placeholder** -- Before calling `SignetTxs::Create`, a 4-byte `SIGNET_HEADER` placeholder (with no solution data) is appended to the witness commitment output. This is critical for signing/verification agreement: during verification, `FetchAndClearCommitmentSection` strips pushdata sections whose data length exceeds 4 bytes (i.e., sections containing `SIGNET_HEADER` + solution), but leaves behind the 4-byte-only placeholder (since it only matches pushdata longer than the header). The Merkle root computed during signing must therefore include this placeholder, so that it matches the Merkle root computed during verification (after the solution is stripped but the placeholder remains).
 
-4. **`FlatSigningProvider` setup** -- A minimal in-memory key store is constructed containing only the signing key. This is the correct approach because `ProduceSignature` is a generic signing function that works with any `SigningProvider`; using `FlatSigningProvider` with a single key avoids any wallet dependency.
+4. **`SignetTxs::Create(*pblock, challenge)`** -- With the placeholder present, the block's coinbase has a witness commitment with the 4-byte `SIGNET_HEADER` push. `FetchAndClearCommitmentSection` does not match it (data length == header length, not greater), so `signet_solution` remains empty, and the signing transaction pair is constructed with an empty spending input. The resulting `signet_merkle` hash reflects the coinbase state with the placeholder -- matching what verification will compute.
 
-5. **`ProduceSignature`** -- Generates a DER-encoded ECDSA signature using `SIGHASH_ALL`. For a 1-of-5 multisig challenge, `ProduceSignature` will construct a `scriptSig` of the form `OP_0 <sig>` (with the mandatory null dummy for `OP_CHECKMULTISIG`). The signature commits to the hash of the synthetic spending transaction, which itself commits to the modified Merkle root (block contents without the signet solution).
+5. **`FlatSigningProvider` setup** -- A minimal in-memory key store is constructed containing only the signing key. This is the correct approach because `ProduceSignature` is a generic signing function that works with any `SigningProvider`; using `FlatSigningProvider` with a single key avoids any wallet dependency.
 
-6. **`UpdateInput`** -- Applies the generated `sigdata` back to `tx_signing.vin[0]`, populating `scriptSig` and `scriptWitness.stack`.
+6. **`ProduceSignature`** -- Generates a DER-encoded ECDSA signature using `SIGHASH_ALL`. For a 1-of-5 multisig challenge, `ProduceSignature` will construct a `scriptSig` of the form `OP_0 <sig>` (with the mandatory null dummy for `OP_CHECKMULTISIG`). The signature commits to the hash of the synthetic spending transaction, which itself commits to the modified Merkle root (block contents with the SIGNET_HEADER placeholder but without the signet solution).
 
-7. **Serialization** -- The signet solution format is: Bitcoin-serialized `scriptSig` followed by Bitcoin-serialized `scriptWitness.stack` (as a vector of vectors). Both are written using `VectorWriter` which produces the same wire encoding that `SpanReader` in `SignetTxs::Create` expects to read back during validation.
+7. **`UpdateInput`** -- Applies the generated `sigdata` back to `tx_signing.vin[0]`, populating `scriptSig` and `scriptWitness.stack`.
 
-8. **Embedding into the coinbase** -- The `SIGNET_HEADER` (`{0xec, 0xc7, 0xda, 0xa2}`) is prepended to the solution bytes, and the combined byte array is appended as a push to the witness commitment output's `scriptPubKey`. The `<<` operator on `CScript` performs a minimal push, so the data will be pushed as an `OP_PUSHDATA` instruction of appropriate length. This is exactly the format that `FetchAndClearCommitmentSection` searches for: a push whose data begins with the 4-byte magic header. The comment in the code now reads "SIGNET_HEADER is defined in signet.h" to reflect the fact that the local `static constexpr` duplicate has been removed.
+8. **Serialization** -- The signet solution format is: Bitcoin-serialized `scriptSig` followed by Bitcoin-serialized `scriptWitness.stack` (as a vector of vectors). Both are written using `VectorWriter` which produces the same wire encoding that `SpanReader` in `SignetTxs::Create` expects to read back during validation.
 
-9. **Merkle root recomputation** -- Modifying the coinbase transaction changes its hash, which changes the Merkle root. `BlockMerkleRoot(*pblock)` recomputes this. The nonce field is not re-initialized because the miner will overwrite it during PoW search anyway. The block template returned by `CreateNewBlock` still has `nNonce = 0`.
+9. **Embedding into the coinbase** -- The original `scriptPubKey` (without the placeholder) is restored, then the `SIGNET_HEADER` (`{0xec, 0xc7, 0xda, 0xa2}`) is prepended to the solution bytes, and the combined byte array is appended as a push to the witness commitment output's `scriptPubKey`. The `<<` operator on `CScript` performs a minimal push, so the data will be pushed as an `OP_PUSHDATA` instruction of appropriate length. This is exactly the format that `FetchAndClearCommitmentSection` searches for: a push whose data begins with the 4-byte magic header and has data length > 4. During verification, `FetchAndClearCommitmentSection` strips this full push (header + solution) but leaves the 4-byte-only placeholder from step 3, ensuring the Merkle roots match.
 
-10. **`TestBlockValidity`** -- The existing call to `TestBlockValidity` at the end of `CreateNewBlock` (which runs after the signet block shown above) will now validate the signed template. This means `ContextualCheckBlock` (which calls `CheckSignetBlockSolution`) runs on the template before it is handed to the miner, providing early detection of any signing errors.
+10. **Merkle root recomputation** -- Modifying the coinbase transaction changes its hash, which changes the Merkle root. `BlockMerkleRoot(*pblock)` recomputes this. The nonce field is not re-initialized because the miner will overwrite it during PoW search anyway. The block template returned by `CreateNewBlock` still has `nNonce = 0`.
+
+11. **`TestBlockValidity`** -- The existing call to `TestBlockValidity` at the end of `CreateNewBlock` (which runs after the signet block shown above) will now validate the signed template. This means `ContextualCheckBlock` (which calls `CheckSignetBlockSolution`) runs on the template before it is handed to the miner, providing early detection of any signing errors.
 
 **Cross-references:**
 - The `SIGNET_HEADER` constant is now sourced from `signet.h` (via the `#include <signet.h>` already present). The previous local `static constexpr uint8_t SIGNET_HEADER[4]` definition has been removed.
@@ -1165,7 +1183,7 @@ The three-way coordination between zero subsidy, difficulty reset, and signet au
 
 4. **~~Hardcoded "5" in error message~~ FIXED.** `init.cpp` now uses `ExtractPubkeysFromChallenge()` to derive the count dynamically from the challenge script.
 
-5. **No unit tests for the new consensus rules.** The existing test framework (functional tests and unit tests inherited from Bitcoin Core) does not include tests specific to the `nSignetActivationHeight` path. Test coverage for: (a) zero-subsidy at exactly height 450000 vs 449999; (b) difficulty reset at the boundary; (c) signet check accept/reject at the boundary; should be added before deployment.
+5. **~~No unit tests for the new consensus rules~~ FIXED.** Comprehensive unit tests added in `src/test/alpha_signet_fork_tests.cpp` (8 test cases): subsidy boundary, fork-disabled guard, `ExtractPubkeysFromChallenge` helper, `CheckSignetBlockSolution` height gating, post-fork zero coinbase via `CreateNewBlock`, pre-fork normal subsidy, rejection of non-zero coinbase post-fork, and difficulty reset to `powLimit` at fork height. Tests use REGTEST (SHA256 PoW) with `g_isAlpha = true` and `const_cast` consensus params to set a low fork height, avoiding RandomX dependency.
 
 ---
 
@@ -1185,8 +1203,10 @@ The three-way coordination between zero subsidy, difficulty reset, and signet au
 | `src/validation.cpp` | 5 edits: zero subsidy, fee burning (`blockReward = 0`), timebomb removal, 2 signet checks | Core consensus enforcement |
 | `src/pow.cpp` | 1 edit: difficulty reset at fork height | Prevent chain stall at fork |
 | `src/node/miner.h` | Added global key declaration | `extern CKey g_alpha_signet_key` |
-| `src/node/miner.cpp` | Added key definition + template signing logic + fee burning (`coinbaseTx.vout[0].nValue = 0`); uses `signet_challenge`; removed local SIGNET_HEADER | Embed BIP325 signet solution in block templates; zero coinbase value post-fork |
+| `src/node/miner.cpp` | Added key definition + template signing logic with SIGNET_HEADER placeholder + fee burning (`coinbaseTx.vout[0].nValue = 0`); uses `signet_challenge`; removed local SIGNET_HEADER | Embed BIP325 signet solution in block templates; zero coinbase value post-fork |
 | `src/init.cpp` | Startup logging, CLI warning, refactored key validation using `signet_challenge` | Log fork params, warn on mainnet CLI args, use shared helper |
+| `src/test/alpha_signet_fork_tests.cpp` | New test file: 8 test cases for fork consensus rules | Unit tests for subsidy, fee burning, signet auth, difficulty reset, pubkey extraction |
+| `src/Makefile.test.include` | Added `alpha_signet_fork_tests.cpp` to test source list | Register new test file |
 
 ---
 
