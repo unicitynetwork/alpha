@@ -1258,8 +1258,13 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
             LogPrintf("Alpha signet fork: disabled (height=%d)\n", fp.nSignetActivationHeight);
         }
         if (chainparams.GetChainType() == ChainType::ALPHAMAIN) {
-            if (args.IsArgSet("-signetforkheight") || args.IsArgSet("-signetforkpubkeys")) {
-                LogPrintf("WARNING: -signetforkheight/-signetforkpubkeys ignored on mainnet.\n");
+            if (args.IsArgSet("-signetforkheight")) {
+                return InitError(Untranslated("-signetforkheight is not allowed on mainnet. "
+                    "Mainnet uses hardcoded fork parameters that cannot be overridden."));
+            }
+            if (args.IsArgSet("-signetforkpubkeys")) {
+                return InitError(Untranslated("-signetforkpubkeys is not allowed on mainnet. "
+                    "Mainnet uses hardcoded fork parameters that cannot be overridden."));
             }
         }
     }

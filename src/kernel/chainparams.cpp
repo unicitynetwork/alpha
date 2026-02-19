@@ -167,11 +167,11 @@ public:
         // Replace placeholder pubkeys with actual 33-byte compressed pubkeys before deployment
         consensus.signet_challenge = ParseHex(
             "51"                                                              // OP_1
-            "21" "PLACEHOLDER_PUBKEY_1_33_BYTES_HEX_66_CHARS_HERE_0000000001"  // push 33 bytes + pubkey 1
-            "21" "PLACEHOLDER_PUBKEY_2_33_BYTES_HEX_66_CHARS_HERE_0000000002"  // push 33 bytes + pubkey 2
-            "21" "PLACEHOLDER_PUBKEY_3_33_BYTES_HEX_66_CHARS_HERE_0000000003"  // push 33 bytes + pubkey 3
-            "21" "PLACEHOLDER_PUBKEY_4_33_BYTES_HEX_66_CHARS_HERE_0000000004"  // push 33 bytes + pubkey 4
-            "21" "PLACEHOLDER_PUBKEY_5_33_BYTES_HEX_66_CHARS_HERE_0000000005"  // push 33 bytes + pubkey 5
+            "21" "02a86f4a1875e967435d9836df3dfba75fc84700af293ce487a99d6adb6f4ebecc"  // push 33 bytes + pubkey 1
+            "21" "0234dae4ef312c640fa00f4d74048da77262224e506341b85f0b2a783c811bcef0"  // push 33 bytes + pubkey 2
+            "21" "023602941d79d865ad32e88265feb101f3990a813d46b2fc01bc6601e9df7d69cc"  // push 33 bytes + pubkey 3
+            "21" "024f12994fae223c07a2a802b9fa0cb8a1f5d24a7fedc40d3c2fad0a69574b2f9e"  // push 33 bytes + pubkey 4
+            "21" "030934597b587069a9bb885782790eae0b16496e4863d0d6b7ad1ba0de0b078b3e"  // push 33 bytes + pubkey 5
             "55"                                                              // OP_5
             "ae"                                                              // OP_CHECKMULTISIG
         );

@@ -166,3 +166,7 @@ dist/
 /ci/scratch/
 
 .vscode
+
+# Alpha mainnet signing keys
+.env
+.env.*
