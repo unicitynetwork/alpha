@@ -526,13 +526,17 @@ CONFEOF
     done
 
     logs=$(docker logs "${CONTAINER_PREFIX}3" 2>&1 || echo "")
+    final_status=$(docker inspect -f '{{.State.Running}}' "${CONTAINER_PREFIX}3" 2>/dev/null || echo "false")
 
+    # Container MUST have stopped AND show the rejection message
     TESTS_TOTAL=$((TESTS_TOTAL + 1))
-    if echo "$logs" | grep -q "NOT in the authorized allowlist\|Invalid -signetblockkey"; then
-        echo -e "  ${GREEN}PASS${NC}: wrong key rejected at startup"
+    if echo "$logs" | grep -qE "NOT in the authorized allowlist|Invalid -signetblockkey" \
+            && [ "$final_status" = "false" ]; then
+        echo -e "  ${GREEN}PASS${NC}: wrong key rejected and node exited"
         TESTS_PASSED=$((TESTS_PASSED + 1))
     else
-        echo -e "  ${RED}FAIL${NC}: expected key rejection error in logs"
+        echo -e "  ${RED}FAIL${NC}: expected key rejection + container exit"
+        echo "  Container running: ${final_status}"
         echo "  Last 10 lines of logs:"
         echo "$logs" | tail -10
         TESTS_FAILED=$((TESTS_FAILED + 1))

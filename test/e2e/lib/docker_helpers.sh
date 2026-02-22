@@ -114,7 +114,8 @@ start_external_miner() {
     local container="${CONTAINER_PREFIX}${node}"
     local addr
     addr=$(cli "$node" -rpcwallet=test getnewaddress)
-    docker exec "$container" sh -c "echo '${addr}' > /tmp/miner_addrs.txt"
+    # Write address via stdin to avoid shell injection from RPC-derived values
+    echo "$addr" | docker exec -i "$container" sh -c 'cat > /tmp/miner_addrs.txt'
     docker exec -d "$container" sh -c "minerd \
         -o http://127.0.0.1:${RPC_PORT} \
         -O ${RPC_USER}:${RPC_PASS} \

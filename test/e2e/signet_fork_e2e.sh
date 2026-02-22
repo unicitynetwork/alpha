@@ -92,17 +92,13 @@ test_header "02" "Pre-fork mining by non-authorized node"
     sync_blocks 30
 
     h0=$(get_height 0)
-    if [ "$h0" = "10" ]; then
-        # Block 10 is the fork height — if node5 mined it, it would need signing.
-        # Either this succeeded (soft-fork compatible) or the block was at fork height.
-        cb_val=$(get_coinbase_value 0 10)
-        assert_eq "non-auth node mined block, accepted" "10" "$h0" || true
+    # Verify chain progressed (node5 should be able to mine pre-fork)
+    assert_ge "chain at height >= 9 after non-auth mining" "9" "$h0" || true
+    if [ "$h0" -ge "10" ]; then
+        echo "  non-auth node mined to height ${h0} (at or past fork boundary)"
     else
         echo "  (node5 pre-fork mine result: ${result:0:100})"
     fi
-
-    h=$(get_height 0)
-    assert_ge "chain at height >= 9" "9" "$h" || true
 
     if [ "$h" -lt "10" ]; then
         echo "  (chain still at pre-fork height, proceeding to fork boundary tests)"
@@ -189,11 +185,18 @@ test_header "05" "Post-fork mining continues"
 
 test_header "06" "Non-authorized node cannot mine post-fork"
 {
-    h_before=$(get_height 5)
+    h0_before=$(get_height 0)
+    h5_before=$(get_height 5)
     advance_mocktime 300
-    result=$(cli 5 generatetoaddress 1 "$(cli 5 getnewaddress)" 2>&1) || true
-    h_after=$(get_height 5)
+    result=$(cli 5 generatetoaddress 1 "$(cli 5 getnewaddress 2>/dev/null || echo 'ralpha1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq6ayzv5')" 2>&1) || true
+    sleep 2
+    h5_after=$(get_height 5)
+    h0_after=$(get_height 0)
 
+    # Primary assertion: height did NOT advance (security-critical)
+    assert_eq "node5 height unchanged (cannot mine post-fork)" "$h5_before" "$h5_after" || true
+    assert_eq "node0 height unchanged (no block from non-auth node)" "$h0_before" "$h0_after" || true
+    # Secondary: verify we got the expected error message
     TESTS_TOTAL=$((TESTS_TOTAL + 1))
     if echo "$result" | grep -q "No signing key configured"; then
         echo -e "  ${GREEN}PASS${NC}: non-authorized node got error: No signing key configured"
@@ -218,9 +221,17 @@ test_header "07" "All 5 authorized keys mine independently"
 
     hash0=$(get_best_hash 0)
     all_agree=true
+    # Guard: empty hash0 means RPC failure, not consensus
+    if [ -z "$hash0" ]; then
+        all_agree=false
+        echo -e "  ${RED}node0 hash is empty (RPC error)${NC}"
+    fi
     for i in $(seq 1 $((NUM_NODES - 1))); do
         hi=$(get_best_hash "$i")
-        if [ "$hash0" != "$hi" ]; then
+        if [ -z "$hi" ]; then
+            all_agree=false
+            echo -e "  ${RED}node${i} hash is empty (RPC error)${NC}"
+        elif [ "$hash0" != "$hi" ]; then
             all_agree=false
             echo -e "  ${RED}node${i} disagrees: ${hi:0:16}...${NC}"
         fi
@@ -394,15 +405,15 @@ test_header "11" "Transaction with fee burning"
                 fi
             fi
         else
-            echo "  WARNING: sendtoaddress failed: ${txid:0:120}"
-            echo "  (Skipping fee-burn assertion — may lack mature UTXOs)"
+            echo -e "  ${RED}FAIL${NC}: sendtoaddress failed: ${txid:0:120}"
+            echo "  (Cannot verify fee-burn without a valid transaction)"
             TESTS_TOTAL=$((TESTS_TOTAL + 2))
-            TESTS_PASSED=$((TESTS_PASSED + 2))
+            TESTS_FAILED=$((TESTS_FAILED + 2))
         fi
     else
-        echo "  WARNING: no mature UTXOs found on node0, skipping tx test"
+        echo -e "  ${RED}FAIL${NC}: no mature UTXOs found on node0 — cannot test fee burning"
         TESTS_TOTAL=$((TESTS_TOTAL + 2))
-        TESTS_PASSED=$((TESTS_PASSED + 2))
+        TESTS_FAILED=$((TESTS_FAILED + 2))
     fi
 }
 
@@ -427,17 +438,17 @@ test_header "12" "Single-input transaction restriction"
             signed_hex=$(echo "$signed" | jq -r '.hex // empty')
             if [ -n "$signed_hex" ]; then
                 send_result=$(cli 0 -rpcwallet=test sendrawtransaction "$signed_hex" 2>&1) || true
-                assert_contains "multi-input tx rejected" "bad-txns-too-many-inputs\|too-many-inputs\|TX rejected" "$send_result" || true
+                assert_contains "multi-input tx rejected" "bad-txns-too-many-inputs|too-many-inputs|TX rejected" "$send_result" || true
             else
-                assert_contains "multi-input tx signing failed or rejected" "bad-txns-too-many-inputs\|error\|too-many" "$signed" || true
+                assert_contains "multi-input tx signing failed or rejected" "bad-txns-too-many-inputs|too-many-inputs" "$signed" || true
             fi
         else
-            assert_contains "multi-input raw tx creation rejected" "bad-txns-too-many-inputs\|too-many\|error" "$raw_result" || true
+            assert_contains "multi-input raw tx creation rejected" "bad-txns-too-many-inputs|too-many-inputs" "$raw_result" || true
         fi
     else
-        echo "  WARNING: fewer than 2 UTXOs available, skipping multi-input test"
+        echo -e "  ${RED}FAIL${NC}: fewer than 2 UTXOs available — cannot test multi-input rejection"
         TESTS_TOTAL=$((TESTS_TOTAL + 1))
-        TESTS_PASSED=$((TESTS_PASSED + 1))
+        TESTS_FAILED=$((TESTS_FAILED + 1))
     fi
 }
 
@@ -493,13 +504,17 @@ CONFEOF
         sleep 2
     done
 
+    # Container MUST have stopped AND show the rejection message
+    final_status=$(docker inspect -f '{{.State.Running}}' "${CONTAINER_PREFIX}7" 2>/dev/null || echo "false")
     TESTS_TOTAL=$((TESTS_TOTAL + 1))
-    if echo "$logs" | grep -q "NOT in the authorized allowlist\|Invalid -signetblockkey"; then
-        echo -e "  ${GREEN}PASS${NC}: wrong key rejected at startup"
+    if echo "$logs" | grep -qE "NOT in the authorized allowlist|Invalid -signetblockkey" \
+            && [ "$final_status" = "false" ]; then
+        echo -e "  ${GREEN}PASS${NC}: wrong key rejected and node exited"
         TESTS_PASSED=$((TESTS_PASSED + 1))
     else
-        echo -e "  ${RED}FAIL${NC}: expected key rejection error in logs"
-        echo "  Container running: ${container_status}"
+        echo -e "  ${RED}FAIL${NC}: expected key rejection + container exit"
+        echo "  Container running: ${final_status}"
+        echo "  Logs contain rejection: $(echo "$logs" | grep -cE 'NOT in the authorized allowlist|Invalid -signetblockkey')"
         echo "  Logs (last 200 chars): ${logs: -200}"
         TESTS_FAILED=$((TESTS_FAILED + 1))
     fi
@@ -596,9 +611,9 @@ CONFEOF
             fi
         fi
     else
-        echo -e "  ${YELLOW}SKIP${NC}: non-fork node failed to start"
+        echo -e "  ${RED}FAIL${NC}: non-fork node failed to start — cannot test backward compatibility"
         TESTS_TOTAL=$((TESTS_TOTAL + 1))
-        TESTS_PASSED=$((TESTS_PASSED + 1))
+        TESTS_FAILED=$((TESTS_FAILED + 1))
     fi
 
     docker rm -f "${CONTAINER_PREFIX}8" >/dev/null 2>&1 || true
@@ -610,9 +625,17 @@ test_header "15" "Consensus agreement — all nodes identical state"
 
     hash0=$(get_best_hash 0)
     all_match=true
+    # Guard: empty hash means RPC failure, not consensus
+    if [ -z "$hash0" ]; then
+        all_match=false
+        echo -e "  ${RED}node0 hash is empty (RPC error)${NC}"
+    fi
     for i in $(seq 1 $((NUM_NODES - 1))); do
         hi=$(get_best_hash "$i")
-        if [ "$hash0" != "$hi" ]; then
+        if [ -z "$hi" ]; then
+            all_match=false
+            echo -e "  ${RED}node${i} hash is empty (RPC error)${NC}"
+        elif [ "$hash0" != "$hi" ]; then
             all_match=false
             echo -e "  ${RED}node${i} hash mismatch: ${hi:0:16}...${NC}"
         fi
@@ -632,16 +655,21 @@ test_header "15" "Consensus agreement — all nodes identical state"
     if [ -n "$utxo0" ] && [ -n "$utxo6" ]; then
         assert_eq "UTXO set hash matches (node0 vs node6)" "$utxo0" "$utxo6" || true
     else
-        echo "  (gettxoutsetinfo not available or slow, skipping UTXO hash comparison)"
+        echo -e "  ${RED}FAIL${NC}: gettxoutsetinfo failed — cannot verify UTXO set equality"
         TESTS_TOTAL=$((TESTS_TOTAL + 1))
-        TESTS_PASSED=$((TESTS_PASSED + 1))
+        TESTS_FAILED=$((TESTS_FAILED + 1))
     fi
 
+    # Always count checkpoint assertions (3 total)
     for ckpt in 5 10 15; do
         h0_hash=$(cli 0 getblockhash "$ckpt" 2>/dev/null || echo "")
         h6_hash=$(cli 6 getblockhash "$ckpt" 2>/dev/null || echo "")
         if [ -n "$h0_hash" ] && [ -n "$h6_hash" ]; then
             assert_eq "block ${ckpt} hash matches (node0 vs node6)" "$h0_hash" "$h6_hash" || true
+        else
+            echo -e "  ${RED}FAIL${NC}: block ${ckpt} hash comparison failed (empty hash from RPC)"
+            TESTS_TOTAL=$((TESTS_TOTAL + 1))
+            TESTS_FAILED=$((TESTS_FAILED + 1))
         fi
     done
 }
@@ -661,9 +689,9 @@ test_header "16" "Block template inspection"
         expected_h=$((tip + 1))
         assert_eq "template height = tip+1" "$expected_h" "$tmpl_height" || true
     else
-        echo "  WARNING: getblocktemplate returned error: ${template:0:200}"
+        echo -e "  ${RED}FAIL${NC}: getblocktemplate returned error: ${template:0:200}"
         TESTS_TOTAL=$((TESTS_TOTAL + 2))
-        TESTS_PASSED=$((TESTS_PASSED + 2))
+        TESTS_FAILED=$((TESTS_FAILED + 2))
     fi
 
     hash10=$(cli 0 getblockhash 10)
@@ -678,9 +706,9 @@ test_header "16" "Block template inspection"
         if [ -n "$raw_tx" ]; then
             assert_contains "block 10 coinbase contains SIGNET_HEADER" "ecc7daa2" "$raw_tx" || true
         else
-            echo "  WARNING: could not retrieve coinbase hex for block 10"
+            echo -e "  ${RED}FAIL${NC}: could not retrieve coinbase hex for block 10"
             TESTS_TOTAL=$((TESTS_TOTAL + 1))
-            TESTS_PASSED=$((TESTS_PASSED + 1))
+            TESTS_FAILED=$((TESTS_FAILED + 1))
         fi
     fi
 }
@@ -811,19 +839,19 @@ test_header "18" "Non-authorized node creates and sends transaction post-fork"
                     TESTS_FAILED=$((TESTS_FAILED + 1))
                 fi
             else
-                echo "  WARNING: node5 → node6 sendtoaddress failed: ${txid_to6:0:100}"
+                echo -e "  ${RED}FAIL${NC}: node5 → node6 sendtoaddress failed: ${txid_to6:0:100}"
                 TESTS_TOTAL=$((TESTS_TOTAL + 2))
-                TESTS_PASSED=$((TESTS_PASSED + 2))
+                TESTS_FAILED=$((TESTS_FAILED + 2))
             fi
         else
-            echo "  WARNING: node0 → node5 sendtoaddress failed: ${txid_to5:0:100}"
+            echo -e "  ${RED}FAIL${NC}: node0 → node5 sendtoaddress failed: ${txid_to5:0:100}"
             TESTS_TOTAL=$((TESTS_TOTAL + 3))
-            TESTS_PASSED=$((TESTS_PASSED + 3))
+            TESTS_FAILED=$((TESTS_FAILED + 3))
         fi
     else
-        echo "  WARNING: no spendable UTXOs on node0, skipping transaction test"
+        echo -e "  ${RED}FAIL${NC}: no spendable UTXOs on node0 — cannot test transactions"
         TESTS_TOTAL=$((TESTS_TOTAL + 3))
-        TESTS_PASSED=$((TESTS_PASSED + 3))
+        TESTS_FAILED=$((TESTS_FAILED + 3))
     fi
 }
 
@@ -885,12 +913,13 @@ test_header "19" "External miner keeps network producing blocks"
     assert_ge "external miner produced >= ${TARGET_MINER_BLOCKS} blocks" \
         "$TARGET_MINER_BLOCKS" "$actual_mined" || true
 
-    # Assertion 2: All 7 nodes synced
-    hash0=$(cli 0 getbestblockhash)
+    # Assertion 2: All 7 nodes synced (with empty-hash guard)
+    hash0=$(cli 0 getbestblockhash 2>/dev/null || echo "")
     all_synced=true
+    if [ -z "$hash0" ]; then all_synced=false; fi
     for i in $(seq 1 $((NUM_NODES - 1))); do
-        hi=$(cli "$i" getbestblockhash)
-        if [ "$hash0" != "$hi" ]; then all_synced=false; fi
+        hi=$(cli "$i" getbestblockhash 2>/dev/null || echo "")
+        if [ -z "$hi" ] || [ "$hash0" != "$hi" ]; then all_synced=false; fi
     done
     TESTS_TOTAL=$((TESTS_TOTAL + 1))
     if $all_synced; then
@@ -902,10 +931,15 @@ test_header "19" "External miner keeps network producing blocks"
     fi
 
     # Assertion 3: All new blocks have zero coinbase
+    # Guard: if no blocks were mined, this is a failure (empty loop = vacuous pass)
     all_zero=true
+    if [ "$h_after" -le "$h_before" ]; then
+        all_zero=false
+        echo -e "  ${RED}no blocks mined — zero-coinbase check is vacuous${NC}"
+    fi
     for h in $(seq $((h_before + 1)) "$h_after"); do
-        cb=$(get_coinbase_value 0 "$h")
-        if [ "$cb" != "0.00000000" ]; then all_zero=false; fi
+        cb=$(get_coinbase_value 0 "$h" 2>/dev/null || echo "ERROR")
+        if [ "$cb" = "ERROR" ] || [ "$cb" != "0.00000000" ]; then all_zero=false; fi
     done
     TESTS_TOTAL=$((TESTS_TOTAL + 1))
     if $all_zero; then
@@ -917,11 +951,20 @@ test_header "19" "External miner keeps network producing blocks"
     fi
 
     # Assertion 4: Blocks contain SIGNET_HEADER (ecc7daa2)
+    # Guard: empty cb_hex is a failure, not a skip
     all_signed=true
+    if [ "$h_after" -le "$h_before" ]; then
+        all_signed=false
+        echo -e "  ${RED}no blocks mined — signature check is vacuous${NC}"
+    fi
     for h in $(seq $((h_before + 1)) "$h_after"); do
-        blockhash=$(cli 0 getblockhash "$h")
-        cb_hex=$(cli 0 getblock "$blockhash" 2 | jq -r '.tx[0].hex // empty')
-        if [ -n "$cb_hex" ] && ! echo "$cb_hex" | grep -qi "ecc7daa2"; then
+        blockhash=$(cli 0 getblockhash "$h" 2>/dev/null || echo "")
+        if [ -z "$blockhash" ]; then
+            all_signed=false
+            continue
+        fi
+        cb_hex=$(cli 0 getblock "$blockhash" 2 2>/dev/null | jq -r '.tx[0].hex // empty')
+        if [ -z "$cb_hex" ] || ! echo "$cb_hex" | grep -qi "ecc7daa2"; then
             all_signed=false
         fi
     done
@@ -991,10 +1034,10 @@ CONFEOF
     done
 
     if ! $mine_rpc_ready; then
-        echo "  WARNING: integrated-miner node failed to start"
+        echo -e "  ${RED}FAIL${NC}: integrated-miner node failed to start"
         docker logs "${CONTAINER_PREFIX}9" 2>&1 | tail -20
         TESTS_TOTAL=$((TESTS_TOTAL + 4))
-        TESTS_PASSED=$((TESTS_PASSED + 4))
+        TESTS_FAILED=$((TESTS_FAILED + 4))
     else
         # Set mocktime to match the network
         docker exec "${CONTAINER_PREFIX}9" alpha-cli \
@@ -1108,9 +1151,13 @@ CONFEOF
 
         # Assertion 3: All new blocks have zero coinbase
         all_zero=true
+        if [ "$h_after" -le "$h_before" ]; then
+            all_zero=false
+            echo -e "  ${RED}no blocks mined — zero-coinbase check is vacuous${NC}"
+        fi
         for h in $(seq $((h_before + 1)) "$h_after"); do
-            cb=$(get_coinbase_value 0 "$h" 2>/dev/null || echo "unknown")
-            if [ "$cb" != "0.00000000" ]; then all_zero=false; fi
+            cb=$(get_coinbase_value 0 "$h" 2>/dev/null || echo "ERROR")
+            if [ "$cb" = "ERROR" ] || [ "$cb" != "0.00000000" ]; then all_zero=false; fi
         done
         TESTS_TOTAL=$((TESTS_TOTAL + 1))
         if $all_zero; then
@@ -1123,13 +1170,19 @@ CONFEOF
 
         # Assertion 4: Blocks contain SIGNET_HEADER (ecc7daa2)
         all_signed=true
+        if [ "$h_after" -le "$h_before" ]; then
+            all_signed=false
+            echo -e "  ${RED}no blocks mined — signature check is vacuous${NC}"
+        fi
         for h in $(seq $((h_before + 1)) "$h_after"); do
             blockhash=$(cli 0 getblockhash "$h" 2>/dev/null || echo "")
-            if [ -n "$blockhash" ]; then
-                cb_hex=$(cli 0 getblock "$blockhash" 2 | jq -r '.tx[0].hex // empty')
-                if [ -n "$cb_hex" ] && ! echo "$cb_hex" | grep -qi "ecc7daa2"; then
-                    all_signed=false
-                fi
+            if [ -z "$blockhash" ]; then
+                all_signed=false
+                continue
+            fi
+            cb_hex=$(cli 0 getblock "$blockhash" 2 2>/dev/null | jq -r '.tx[0].hex // empty')
+            if [ -z "$cb_hex" ] || ! echo "$cb_hex" | grep -qi "ecc7daa2"; then
+                all_signed=false
             fi
         done
         TESTS_TOTAL=$((TESTS_TOTAL + 1))
