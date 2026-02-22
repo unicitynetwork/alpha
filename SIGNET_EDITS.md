@@ -24,7 +24,7 @@
 
 ## Overview
 
-At block height 450,000, the Alpha mainnet undergoes a programmatic hard fork that transitions the chain from open RandomX proof-of-work mining to a federation-based block production model. This is one of Alpha's scheduled "programmatic hard forks" (the pattern established in the CLAUDE.md as occurring every 50,000 blocks from 400,000 onward).
+At block height 450,000, the Alpha mainnet undergoes a programmatic hard fork that transitions the chain from open RandomX proof-of-work mining to a federation-based block production model. This is one of Alpha's scheduled "programmatic hard forks" (the pattern established in the CLAUDE.md as occurring every 50,000 blocks from 400,000 onward). Note: at fork-adjacent heights (400,000–449,999), the subsidy is already halved to 5 ALPHA per block (halving at block 400,000).
 
 The fork implements three simultaneous consensus rule changes that activate atomically at block 450,000:
 
@@ -60,14 +60,14 @@ Block 450,000 (first fork block)
      |
      +--- Difficulty: GetNextWorkRequired() returns nProofOfWorkLimit
      |     (minimum difficulty, so the block is trivially solvable)
-     |     Future blocks: existing ASERT anchor naturally returns ~powLimit
+     |     Future blocks: ASERT re-anchors at block 450,000 with nBits=powLimit
      |
      +--- Authorization: CheckSignetBlockSolution(block, params, 450000)
            Must find SIGNET_HEADER in coinbase witness commitment
            Signature must satisfy 1-of-5 multisig challenge script
 ```
 
-The three changes interact in a specific order within the validation pipeline. Difficulty is checked at the header level during `CheckProofOfWork`. The subsidy check and signet authorization check both occur during full block connection in `ConnectBlock`. The subsidy check happens after the signet check, so an unauthorized block fails authorization before the coinbase amount is ever evaluated.
+The three changes interact in a specific order within the validation pipeline. Difficulty is checked at the header level during `CheckProofOfWork`. The signet authorization check occurs first in `ContextualCheckBlock` (primary enforcement) and again in `ConnectBlock` (belt-and-suspenders). In `ConnectBlock`, the authorization check precedes the coinbase value check, so an unauthorized block fails authorization before its coinbase amount is ever evaluated. The subsidy check happens after the signet check in `ConnectBlock`.
 
 ---
 
@@ -119,14 +119,13 @@ The three changes interact in a specific order within the validation pipeline. D
 +        consensus.nSignetActivationHeight = 450000;
 +
 +        // 1-of-5 bare multisig challenge: OP_1 <pk1> <pk2> <pk3> <pk4> <pk5> OP_5 OP_CHECKMULTISIG
-+        // Replace placeholder pubkeys with actual 33-byte compressed pubkeys before deployment
 +        consensus.signet_challenge = ParseHex(
 +            "51"                                                              // OP_1
-+            "21" "PLACEHOLDER_PUBKEY_1_33_BYTES_HEX_66_CHARS_HERE_0000000001"  // push 33 bytes + pubkey 1
-+            "21" "PLACEHOLDER_PUBKEY_2_33_BYTES_HEX_66_CHARS_HERE_0000000002"  // push 33 bytes + pubkey 2
-+            "21" "PLACEHOLDER_PUBKEY_3_33_BYTES_HEX_66_CHARS_HERE_0000000003"  // push 33 bytes + pubkey 3
-+            "21" "PLACEHOLDER_PUBKEY_4_33_BYTES_HEX_66_CHARS_HERE_0000000004"  // push 33 bytes + pubkey 4
-+            "21" "PLACEHOLDER_PUBKEY_5_33_BYTES_HEX_66_CHARS_HERE_0000000005"  // push 33 bytes + pubkey 5
++            "21" "02a86f4a1875e967435d9836df3dfba75fc84700af293ce487a99d6adb6f4ebecc"  // push 33 bytes + pubkey 1
++            "21" "0234dae4ef312c640fa00f4d74048da77262224e506341b85f0b2a783c811bcef0"  // push 33 bytes + pubkey 2
++            "21" "023602941d79d865ad32e88265feb101f3990a813d46b2fc01bc6601e9df7d69cc"  // push 33 bytes + pubkey 3
++            "21" "024f12994fae223c07a2a802b9fa0cb8a1f5d24a7fedc40d3c2fad0a69574b2f9e"  // push 33 bytes + pubkey 4
++            "21" "030934597b587069a9bb885782790eae0b16496e4863d0d6b7ad1ba0de0b078b3e"  // push 33 bytes + pubkey 5
 +            "55"                                                              // OP_5
 +            "ae"                                                              // OP_CHECKMULTISIG
 +        );
@@ -139,14 +138,12 @@ Note: the mainnet constructor also sets `consensus.signet_blocks = false` (a pre
 
 - `consensus.nSignetActivationHeight = 450000` -- Sets the fork activation height. This is the first block that must comply with all three new consensus rules.
 
-- `consensus.signet_challenge = ParseHex(...)` -- The challenge script is stored in the pre-existing `signet_challenge` field. It encodes a 1-of-5 bare multisig in standard Script. The byte encoding is:
+- `consensus.signet_challenge = ParseHex(...)` -- The challenge script is stored in the pre-existing `signet_challenge` field. It encodes a 1-of-5 bare multisig in standard Script. The five real compressed secp256k1 pubkeys are now deployed (see keys above). The byte encoding is:
   - `0x51` = `OP_1` (minimum signature count required)
   - `0x21` = push 33 bytes (compressed public key length)
   - 66 hex characters = 33 bytes of compressed public key (one for each of the 5 authorized signers)
   - `0x55` = `OP_5` (total number of keys)
   - `0xae` = `OP_CHECKMULTISIG`
-
-  The current placeholder strings (e.g., `PLACEHOLDER_PUBKEY_1_33_BYTES_HEX_66_CHARS_HERE_0000000001`) are not valid compressed public keys. They must be replaced with actual 33-byte compressed secp256k1 public keys before the binary is deployed. See the [Deployment Notes](#deployment-notes) section.
 
   The choice of bare multisig (rather than P2SH or P2WSH wrapping) is consistent with the Bitcoin signet design, where the challenge is placed directly as the scriptPubKey of the `m_to_spend` output in the synthetic signing transaction pair. Bare multisig scripts can be verified by `VerifyScript` without any additional wrapping.
 
@@ -177,8 +174,7 @@ After initialization, the exact same `CheckSignetBlockSolution` code path runs f
 **Full path:** `/home/vrogojin/alpha/src/signet.h`
 
 ```diff
-@@ -5,6 +5,9 @@
- #include <pubkey.h>
+@@ -14,6 +14,9 @@
  #include <cstdint>
  #include <optional>
 
@@ -220,7 +216,8 @@ The two-overload distinction is critical: calling the wrong overload would eithe
 
 **Cross-references:**
 - `CheckSignetBlockSolution` (3-arg) and `ExtractPubkeysFromChallenge` are both implemented in `src/signet.cpp`.
-- Both are called from `src/validation.cpp` (two call sites), `src/node/miner.cpp`, and `src/init.cpp`.
+- `CheckSignetBlockSolution` (3-arg) is called from `src/validation.cpp` (two call sites: `ContextualCheckBlock` and `ConnectBlock`) and indirectly via `TestBlockValidity` in `src/node/miner.cpp`.
+- `ExtractPubkeysFromChallenge` is called from `src/init.cpp` (startup key validation and logging).
 - `SIGNET_HEADER` is used in `src/signet.cpp` (via `FetchAndClearCommitmentSection`) and in `src/node/miner.cpp` (when embedding the solution into the coinbase).
 
 ---
@@ -232,7 +229,7 @@ The two-overload distinction is critical: calling the wrong overload would eithe
 **Full path:** `/home/vrogojin/alpha/src/signet.cpp`
 
 ```diff
--// static constexpr uint8_t SIGNET_HEADER[4] = {0xec, 0xc7, 0xda, 0xa2};
+-static constexpr uint8_t SIGNET_HEADER[4] = {0xec, 0xc7, 0xda, 0xa2};
 +// SIGNET_HEADER is now defined in signet.h (inline constexpr)
 
 +/**
@@ -319,7 +316,7 @@ The two-overload distinction is critical: calling the wrong overload would eithe
 
 **Line-by-line explanation:**
 
-- **`SIGNET_HEADER` removal** -- The file-scope `static constexpr uint8_t SIGNET_HEADER[4]` definition has been removed from `signet.cpp`. The constant is now obtained from the `signet.h` header via the `inline constexpr` definition. The comment at line 26 reads "SIGNET_HEADER is now defined in signet.h (inline constexpr)" to document this change.
+- **`SIGNET_HEADER` removal** -- The file-scope `static constexpr uint8_t SIGNET_HEADER[4]` definition (previously a live, uncommented definition) has been removed from `signet.cpp`. The constant is now obtained from the `signet.h` header via the `inline constexpr` definition. The comment at line 26 reads "SIGNET_HEADER is now defined in signet.h (inline constexpr)" to document this change.
 
 - **`VerifySignetChallenge` static helper** -- A new `static bool VerifySignetChallenge(const CBlock& block, const std::vector<uint8_t>& challenge)` function deduplicates the shared verification kernel: `SignetTxs::Create` -> `PrecomputedTransactionData` -> `TransactionSignatureChecker` -> `VerifyScript`. This logic was previously written out inline in both the two-argument overload (for native BIP325 chains) and the three-argument overload (for Alpha). Extracting it into a shared static function means there is now a single place where the verification sequence is defined, reducing the risk of the two overloads diverging.
 
@@ -540,7 +537,7 @@ The placement of this block is significant. It occurs after:
 
 This ordering is required because `SignetTxs::Create` reads the block's witness commitment to find the signing point, and the commitment must be present before signing begins.
 
-1. **Guard check** -- `g_alpha_signet_key.IsValid()` is checked to catch calls from nodes that started without a signing key configured. Since the startup validation only logs a warning (rather than refusing to start) when the fork is active and no key is present, this guard ensures that any RPC caller requesting a block template receives a clear error message rather than producing an invalid block.
+1. **Guard check** -- `g_alpha_signet_key.IsValid()` is checked to catch calls from nodes that started without a signing key configured. Since the startup validation is silent when no key is configured (rather than requiring one to start), this guard ensures that any RPC caller requesting a block template receives a clear error message rather than producing an invalid block.
 
 2. **Challenge construction** -- `cparams.signet_challenge` is the same field set in `chainparams.cpp` via `consensus.signet_challenge = ParseHex(...)`. Because `signet_blocks = false` on Alpha chains, the native BIP325 checker never reads this field; the signing code here is the only consumer on Alpha chains.
 
@@ -570,9 +567,11 @@ This ordering is required because `SignetTxs::Create` reads the block's witness 
 
 ### src/pow.cpp
 
-**Role:** Implements `GetNextWorkRequired`, the function that computes the required difficulty (`nBits`) for the next block. Two changes are added: an explicit difficulty reset at the fork height, and a post-fork ASERT anchor switch.
+**Role:** Implements `GetNextWorkRequired`, the function that computes the required difficulty (`nBits`) for the next block. Two changes are added: an explicit difficulty reset at the fork height, and a post-fork ASERT anchor re-base.
 
 **Full path:** `/home/vrogojin/alpha/src/pow.cpp`
+
+#### Change 1: Difficulty reset at fork height
 
 ```diff
 +    // !ALPHA SIGNET FORK - Reset difficulty to powLimit at fork activation
@@ -582,13 +581,42 @@ This ordering is required because `SignetTxs::Create` reads the block's witness 
 +    // !ALPHA SIGNET FORK END
 ```
 
-**Line-by-line explanation:**
+This guard checks whether the block being computed (`pindexLast->nHeight + 1`) is exactly the activation height. When true, it returns `nProofOfWorkLimit` unconditionally. `nProofOfWorkLimit` is computed as `UintToArith256(params.powLimit).GetCompact()` at the start of `GetNextWorkRequired`. The `powLimit` for Alpha mainnet is defined as `uint256S("000fffff00000000000000000000000000000000000000000000000000000000")` in `chainparams.cpp` (note: the genesis block's `nBits` is `0x1d0fffff`, which is a different value used only for the genesis block).
 
-This guard checks whether the block being computed (`pindexLast->nHeight + 1`) is exactly the activation height. When true, it returns `nProofOfWorkLimit` unconditionally. `nProofOfWorkLimit` is computed as `UintToArith256(params.powLimit).GetCompact()` at the start of `GetNextWorkRequired`. The `powLimit` for Alpha mainnet is `0x1d0fffff` (a very low difficulty).
+Why a difficulty reset is necessary: In the weeks or months before block 450,000, mining activity on the Alpha mainnet is driven by economic incentive (the 5 ALPHA block subsidy post-halving at block 400,000). ASERT continuously adjusts difficulty to maintain the 2-minute target. At block 450,000, the subsidy drops to zero. If the only authorized block producers are the five keyholders and they are not running industrial mining equipment, they would be unable to find blocks at the difficulty level established by RandomX miners. The explicit reset to minimum difficulty ensures the first post-fork block can be produced essentially immediately, and ASERT then adjusts from there.
 
-Why a difficulty reset is necessary: In the weeks or months before block 450,000, mining activity on the Alpha mainnet is driven by economic incentive (the 5 ALPHA block subsidy). ASERT continuously adjusts difficulty to maintain the 2-minute target. At block 450,000, the subsidy drops to zero. If the only authorized block producers are the five keyholders and they are not running industrial mining equipment, they would be unable to find blocks at the difficulty level established by RandomX miners. The explicit reset to minimum difficulty ensures the first post-fork block can be produced essentially immediately, and ASERT then adjusts from there.
+#### Change 2: Post-fork ASERT re-anchor at block 450,000
 
-After the difficulty reset at block 450,000, blocks 450,001 onward continue to use the existing ASERT anchor from block 70,232 (`asertAnchorParams`). No new post-fork anchor is needed because the original anchor was set to `powLimit` when ASERT was activated at the SHA256-to-RandomX transition. Since ASERT has maintained approximately 2-minute blocks throughout the chain's history, the cumulative time drift from the anchor is minimal, and ASERT naturally computes a difficulty close to `powLimit` for post-fork blocks. This is the same pattern that worked successfully during the SHA256-to-RandomX mining transition.
+```diff
++            // !ALPHA SIGNET FORK - Use fork block as new ASERT anchor post-fork
++            // After the signet fork, ASERT must anchor from the fork block (which
++            // reset difficulty to powLimit) rather than the original anchor at
++            // block 70232, otherwise ASERT computes an astronomically high difficulty.
++            if (g_isAlpha && params.nSignetActivationHeight > 0 && pindexLast->nHeight + 1 > params.nSignetActivationHeight) {
++                const CBlockIndex* pForkBlock = pindexLast;
++                while (pForkBlock && pForkBlock->nHeight > params.nSignetActivationHeight) {
++                    pForkBlock = pForkBlock->pprev;
++                }
++                if (pForkBlock && pForkBlock->nHeight == params.nSignetActivationHeight) {
++                    const CBlockIndex* pForkPrev = pForkBlock->pprev;
++                    Consensus::Params::ASERTAnchor forkAnchor{
++                        params.nSignetActivationHeight,   // anchor height
++                        nProofOfWorkLimit,                // anchor nBits (powLimit)
++                        pForkPrev ? pForkPrev->GetBlockTime() : pForkBlock->GetBlockTime(),
++                    };
++                    return GetNextASERTWorkRequired(pindexLast, pblock, params, forkAnchor);
++                }
++            }
++            // !ALPHA SIGNET FORK END
+```
+
+After the difficulty reset at block 450,000, blocks 450,001 onward use a **new ASERT anchor at the fork block itself** rather than the original anchor from block 70,232. This is necessary because the time elapsed from block 70,232 to 450,000 (~264 days at 2-minute blocks) causes ASERT to compute an astronomically high difficulty when anchored at 70,232 with `nBits=powLimit`. The new anchor is constructed dynamically by walking back the chain index to the fork block:
+
+- **Anchor height:** `nSignetActivationHeight` (450,000)
+- **Anchor nBits:** `nProofOfWorkLimit` (matching the difficulty reset at the fork)
+- **Anchor timestamp:** `pForkBlock->pprev->GetBlockTime()` (the previous block's timestamp, consistent with ASERT convention)
+
+This code runs inside the ASERT activation check (within `if (params.asertAnchorParams)`) so it inherits all ASERT preconditions. The original `GetNextASERTWorkRequired(pindexLast, pblock, params, *params.asertAnchorParams)` call serves as the fallback for pre-fork blocks.
 
 ---
 
@@ -692,15 +720,21 @@ This removes the old mechanism that forced node shutdown at block 450,000. That 
 
 ```diff
 +// !ALPHA SIGNET FORK
++#include <addresstype.h>
 +#include <key.h>
 +#include <key_io.h>
++#include <node/mining_thread.h>
 +#include <script/script.h>
++#include <signet.h>
 +// !ALPHA SIGNET FORK END
 ```
 
+- `<addresstype.h>` -- For address type utilities used in mining address parsing.
 - `<key.h>` -- For `CKey`, `CPubKey`, `CKeyID`.
 - `<key_io.h>` -- For `DecodeSecret` (WIF decoder).
+- `<node/mining_thread.h>` -- For `node::MiningContext`, the integrated mining thread interface.
 - `<script/script.h>` -- For `CScript`, `opcodetype`, and `GetOp`.
+- `<signet.h>` -- For `ExtractPubkeysFromChallenge` (shared helper for startup key validation).
 
 #### New argument registration
 
@@ -881,21 +915,21 @@ AppInitMain()
     |
     +-- Log fork height + challenge script + authorized pubkeys
     |   (uses ExtractPubkeysFromChallenge shared helper)
-    +-- If mainnet + CLI args set: log WARNING that they are ignored
+    +-- If mainnet + CLI args set (-signetforkheight or -signetforkpubkeys):
+    |     return InitError() — node refuses to start
     |
     +-- Load block index
-    +-- chain_active_height = chainman.ActiveChain().Height()
     |
     v
     [ALPHA SIGNET FORK key validation]
     |
-    +-- if not g_isAlpha: skip
-    +-- if not -server: skip (non-template nodes don't need a key)
-    +-- if chain_active_height < nSignetActivationHeight: skip (fork not active)
-    +-- if chain_active_height >= activation height:
-    |     if no -signetblockkey: log WARNING, continue (node runs as non-mining full node)
-    |     if -signetblockkey provided: validate key against challenge
-    |       (uses ExtractPubkeysFromChallenge, dynamic pubkey count in error msg)
+    +-- if not g_isAlpha or nSignetActivationHeight == 0: skip
+    +-- if no -signetblockkey: no-op (node runs as non-mining full node)
+    +-- if -signetblockkey provided: validate key against challenge
+    |     - DecodeSecret(WIF) — fail on invalid format
+    |     - GetPubKey() + VerifyPubKey() — fail on derivation error
+    |     - ExtractPubkeysFromChallenge → check against allowlist — fail if not authorized
+    |     (uses dynamic pubkey count in error msg)
     |
     v
     [if key validated]
@@ -993,17 +1027,20 @@ Confirm that the 16-character prefix matches the expected public key of your aut
 
 ### What must happen before mainnet deployment
 
-The current code contains placeholder public keys in `src/kernel/chainparams.cpp`. **These placeholders are syntactically valid hex strings so the code compiles and links without error, but they are not valid secp256k1 points.** Deploying with placeholder keys will cause the chain to stall at block 450,000 because no valid signature can be produced. The following must be completed before the binary is released:
+The following deployment steps are tracked below. Steps marked DONE have been completed; remaining steps must be completed before the binary is released.
 
-1. **Generate five key pairs.** Each of the five authorized block producers must generate a fresh key pair on a secure, isolated machine. The private key must be stored securely (hardware wallet, encrypted storage). The compressed public key (33 bytes, 66 hex characters) is the only value that needs to leave the secure environment.
+1. **~~Generate five key pairs.~~ DONE.** Five key pairs were generated using `scripts/generate_mainnet_keys.sh`. The private keys (WIF-encoded) are stored in `.env` (gitignored via `.gitignore`). The script uses a temporary Docker container running `alphad` on `chain=alpha` with a legacy wallet. To regenerate, run `bash scripts/generate_mainnet_keys.sh --force`.
 
-2. **Replace placeholders in chainparams.cpp.** Each of the five `PLACEHOLDER_PUBKEY_N_33_BYTES_HEX_66_CHARS_HERE_000000000N` strings in the `consensus.signet_challenge` `ParseHex` call (in `CAlphaMainParams`) must be replaced with the actual 66-character hex encoding of the corresponding compressed public key. The format is:
-   ```
-   "21" "<66 hex chars of compressed pubkey>"
-   ```
-   The `0x21` prefix byte is a Script push opcode meaning "push 33 bytes." It must be retained.
+2. **~~Replace placeholders in chainparams.cpp.~~ DONE.** The five compressed pubkeys have been deployed in `src/kernel/chainparams.cpp` (lines 168–177):
+   - `02a86f4a1875e967435d9836df3dfba75fc84700af293ce487a99d6adb6f4ebecc`
+   - `0234dae4ef312c640fa00f4d74048da77262224e506341b85f0b2a783c811bcef0`
+   - `023602941d79d865ad32e88265feb101f3990a813d46b2fc01bc6601e9df7d69cc`
+   - `024f12994fae223c07a2a802b9fa0cb8a1f5d24a7fedc40d3c2fad0a69574b2f9e`
+   - `030934597b587069a9bb885782790eae0b16496e4863d0d6b7ad1ba0de0b078b3e`
 
-3. **Verify the challenge script.** After replacement, decode the challenge script and verify that it correctly encodes a 1-of-5 bare multisig:
+   Validation: `test/e2e/mainnet_pubkey_e2e.sh` (Test 2) confirms the `.env` private key derives to the first hardcoded pubkey, and (Test 3) confirms block production works with these keys on `alpharegtest`.
+
+3. **Verify the challenge script.** Decode the challenge script and verify that it correctly encodes a 1-of-5 bare multisig:
    ```python
    from bitcoin.core.script import CScript
    script = bytes.fromhex("51" + "21" + pubkey1 + "21" + pubkey2 + ... + "55" + "ae")
@@ -1074,6 +1111,53 @@ alphad -chain=alphatestnet \
   -signetblockkey=$WIF_FOR_PUBKEY1 \
   -server
 ```
+
+### E2E Docker test suite (`test/e2e/signet_fork_e2e.sh`)
+
+The primary integration test runs 20 tests across 7+ Docker containers on `alpharegtest`:
+
+```bash
+bash test/e2e/signet_fork_e2e.sh
+```
+
+The suite covers 9 phases: pre-fork mining, fork boundary, post-fork authorization, network agreement, transactions, partitions/reorgs, backward compatibility, external miner (minerd via getblocktemplate/submitblock), and integrated miner (`-mine` flag). Total: 59 assertions across 20 tests.
+
+Prerequisites: Docker, `jq`, `bash 4+`. The script builds a Docker image from `docker/Dockerfile` (three-stage: alphad builder + alpha-miner builder + runtime image).
+
+### Deployment-readiness test (`test/e2e/mainnet_pubkey_e2e.sh`)
+
+Standalone test (not part of the 20-test suite) that validates deployment readiness:
+
+```bash
+bash test/e2e/mainnet_pubkey_e2e.sh
+```
+
+5 tests / 10 assertions:
+1. `.env` validation — keys present and valid WIF format
+2. Pubkey derivation — `.env` key derives to the hardcoded mainnet pubkey (uses `chain=alpha` container)
+3. Block production — real pubkeys work on `alpharegtest` (uses `test/e2e/lib/wif_convert.py` to convert mainnet WIF to regtest WIF)
+4. Mainnet rejection — `alphad` with `-signetforkheight` on mainnet exits with `InitError`
+5. Wrong key rejected — unauthorized key fails startup with "NOT in the authorized allowlist"
+
+Prerequisites: Docker, `jq`, `python3`, `bash 4+`, `.env` file (generated by `scripts/generate_mainnet_keys.sh`).
+
+### Integrated mining (`-mine` flag)
+
+The `-mine` flag enables continuous background mining via `src/node/mining_thread.{h,cpp}`:
+
+```bash
+alphad -chain=alpharegtest \
+  -signetforkheight=10 \
+  -signetforkpubkeys=$PUBKEY \
+  -signetblockkey=$WIF \
+  -mine=1 -mineaddress=$ADDR -minethreads=1
+```
+
+The node mines blocks automatically in the background using RandomX PoW. Test 20 in `signet_fork_e2e.sh` validates this mode. Configuration parameters: `-mine` (enable), `-mineaddress=<addr>` (coinbase address), `-minethreads=<n>` (thread count).
+
+### External miner (minerd via getblocktemplate)
+
+The `alpha-miner` (minerd) binary is built as part of the Docker image from `docker/Dockerfile`. It uses the standard `getblocktemplate` / `submitblock` RPC protocol. Test 19 in `signet_fork_e2e.sh` validates that the external miner can produce post-fork blocks when the signing key is configured on the `alphad` node.
 
 ### Unit test considerations
 
@@ -1170,12 +1254,12 @@ The three-way coordination between zero subsidy, difficulty reset, and signet au
   - The template for this block is produced by `CreateNewBlock` with the signing logic embedded.
 - Block 450001+:
   - Subsidy remains 0, fees remain burned (`blockReward = 0`).
-  - ASERT continues using the original anchor from block 70,232; since the chain has maintained ~2-minute blocks, the computed difficulty remains near `powLimit`.
+  - ASERT uses a new dynamic anchor at block 450,000 (nBits=powLimit, timestamp from block 449,999); difficulty stays near powLimit for post-fork blocks.
   - Authorization required.
 
 ### Open Issues
 
-1. **CRITICAL: Placeholder pubkeys must be replaced.** The `consensus.signet_challenge` in `CAlphaMainParams` uses non-EC-point placeholder byte strings. Deployment with these keys will make all post-fork blocks unverifiable and stall the chain. The five authorized compressed pubkeys must be substituted before any mainnet release.
+1. **~~CRITICAL: Placeholder pubkeys must be replaced.~~ FIXED.** Real compressed secp256k1 pubkeys have been deployed in `CAlphaMainParams`: `02a86f4a...`, `0234dae4...`, `02360294...`, `024f1299...`, `03093459...`. Key pairs generated by `scripts/generate_mainnet_keys.sh` and validated by `test/e2e/mainnet_pubkey_e2e.sh`.
 
 2. **~~SIGNET_HEADER duplication~~ FIXED.** The constant `{0xec, 0xc7, 0xda, 0xa2}` is now defined once in `signet.h` as `inline constexpr uint8_t SIGNET_HEADER[4]` and shared by both `signet.cpp` and `miner.cpp`. The previous duplicate `static constexpr` definition in `miner.cpp` has been removed.
 
@@ -1185,7 +1269,7 @@ The three-way coordination between zero subsidy, difficulty reset, and signet au
 
 5. **~~No unit tests for the new consensus rules~~ FIXED.** Comprehensive unit tests added in `src/test/alpha_signet_fork_tests.cpp` (8 test cases): subsidy boundary, fork-disabled guard, `ExtractPubkeysFromChallenge` helper, `CheckSignetBlockSolution` height gating, post-fork zero coinbase via `CreateNewBlock`, pre-fork normal subsidy, rejection of non-zero coinbase post-fork, and difficulty reset to `powLimit` at fork height. Tests use REGTEST (SHA256 PoW) with `g_isAlpha = true` and `const_cast` consensus params to set a low fork height, avoiding RandomX dependency.
 
-6. **~~No integration / E2E tests~~ FIXED.** Comprehensive E2E Docker test suite added in `test/e2e/` (16 test cases across 7 Docker containers on `alpharegtest`). Validates pre-fork mining, fork boundary activation, post-fork authorized/unauthorized mining, network partition and reorg, fee burning, single-input transaction restriction, wrong-key startup rejection, backward compatibility, consensus agreement, and block template inspection. Run with `bash test/e2e/signet_fork_e2e.sh`.
+6. **~~No integration / E2E tests~~ FIXED.** Comprehensive E2E Docker test suite added in `test/e2e/` (20 test cases across 7+ Docker containers on `alpharegtest`). Validates pre-fork mining, fork boundary activation, post-fork authorized/unauthorized mining, network partition and reorg, fee burning, single-input transaction restriction, wrong-key startup rejection, backward compatibility, consensus agreement, block template inspection, external miner (minerd) via getblocktemplate/submitblock, and integrated miner (`-mine` flag). Run with `bash test/e2e/signet_fork_e2e.sh`. Additionally, a standalone deployment-readiness test (`test/e2e/mainnet_pubkey_e2e.sh`, 5 tests / 10 assertions) validates `.env` key integrity, pubkey derivation against hardcoded mainnet pubkeys, block production with real keys, mainnet InitError on custom args, and wrong-key rejection.
 
 ---
 
@@ -1203,20 +1287,27 @@ The three-way coordination between zero subsidy, difficulty reset, and signet au
 | `src/signet.h` | Exported `SIGNET_HEADER` constant; added height-aware overload + `ExtractPubkeysFromChallenge` | Single source for SIGNET_HEADER; shared pubkey extraction helper |
 | `src/signet.cpp` | Added `VerifySignetChallenge` static helper; removed local SIGNET_HEADER; uses `signet_challenge` | Deduplicated verification kernel; height-gated signet check with explicit header rejection |
 | `src/validation.cpp` | 5 edits: zero subsidy, fee burning (`blockReward = 0`), timebomb removal, 2 signet checks | Core consensus enforcement |
-| `src/pow.cpp` | 1 edit: difficulty reset at fork height | Prevent chain stall at fork |
+| `src/pow.cpp` | 2 edits: difficulty reset at fork height + ASERT re-anchor post-fork | Prevent chain stall at fork; maintain stable difficulty post-fork |
 | `src/node/miner.h` | Added global key declaration | `extern CKey g_alpha_signet_key` |
 | `src/node/miner.cpp` | Added key definition + template signing logic with SIGNET_HEADER placeholder + fee burning (`coinbaseTx.vout[0].nValue = 0`); uses `signet_challenge`; removed local SIGNET_HEADER | Embed BIP325 signet solution in block templates; zero coinbase value post-fork |
 | `src/init.cpp` | Startup logging, CLI warning, refactored key validation using `signet_challenge` | Log fork params, warn on mainnet CLI args, use shared helper |
 | `src/test/alpha_signet_fork_tests.cpp` | New test file: 8 test cases for fork consensus rules | Unit tests for subsidy, fee burning, signet auth, difficulty reset, pubkey extraction |
 | `src/Makefile.test.include` | Added `alpha_signet_fork_tests.cpp` to test source list | Register new test file |
-| `test/e2e/signet_fork_e2e.sh` | New: E2E test orchestration script (16 tests) | Multi-node Docker integration tests for signet fork |
+| `src/node/mining_thread.h` | New: integrated mining interface | `node::MiningContext` struct with Start/Stop |
+| `src/node/mining_thread.cpp` | New: integrated mining implementation | Background mining thread with RandomX PoW |
+| `docker/Dockerfile` | New: three-stage Docker build (alphad builder + miner builder + runtime) | E2E test image with alphad and minerd |
+| `scripts/generate_mainnet_keys.sh` | New: mainnet key generation script | Generates 5 key pairs, writes `.env`, prints pubkeys |
+| `.gitignore` | Added `.env` and `.env.*` exclusion patterns | Keep signing keys out of git |
+| `test/e2e/signet_fork_e2e.sh` | New: E2E test orchestration script (20 tests, 59 assertions) | Multi-node Docker integration tests for signet fork |
+| `test/e2e/mainnet_pubkey_e2e.sh` | New: deployment-readiness test (5 tests, 10 assertions) | Validates .env keys, pubkey derivation, block production, mainnet rejection, wrong-key rejection |
 | `test/e2e/lib/config.sh` | New: test constants and configuration | Ports, chain, colors, counters |
-| `test/e2e/lib/docker_helpers.sh` | New: Docker operations | Image build, container start/stop, mesh connect |
+| `test/e2e/lib/docker_helpers.sh` | New: Docker operations + external miner | Image build, container start/stop, mesh connect, start/stop minerd |
 | `test/e2e/lib/keygen.sh` | New: key generation via temp container | Generate 5 signing key pairs |
 | `test/e2e/lib/node_helpers.sh` | New: RPC wrappers and sync utilities | cli(), sync_blocks(), mine_blocks(), connect/disconnect |
-| `test/e2e/lib/assertions.sh` | New: test assertion functions | assert_eq, assert_contains, assert_fail, etc. |
+| `test/e2e/lib/assertions.sh` | New: test assertion functions | assert_eq, assert_ne, assert_gt, assert_ge, assert_contains, assert_fail |
 | `test/e2e/lib/cleanup.sh` | New: teardown functions | Stop containers, remove network, cleanup temp files |
+| `test/e2e/lib/wif_convert.py` | New: WIF network-version converter | Converts mainnet WIF (0x80) to regtest WIF (0xef) and back |
 
 ---
 
-*Document updated: 2026-02-19. All code modifications are marked with `// !ALPHA SIGNET FORK` and `// !ALPHA SIGNET FORK END` comment delimiters.*
+*Document updated: 2026-02-22. All code modifications are marked with `// !ALPHA SIGNET FORK` and `// !ALPHA SIGNET FORK END` comment delimiters.*
