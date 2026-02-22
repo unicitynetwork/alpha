@@ -170,3 +170,7 @@ dist/
 # Alpha mainnet signing keys
 .env
 .env.*
+
+# Local build artifacts and config
+build-output/
+config/
