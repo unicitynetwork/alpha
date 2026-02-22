@@ -100,7 +100,7 @@ test_header "02" "Pre-fork mining by non-authorized node"
         echo "  (node5 pre-fork mine result: ${result:0:100})"
     fi
 
-    if [ "$h" -lt "10" ]; then
+    if [ "$h0" -lt "10" ]; then
         echo "  (chain still at pre-fork height, proceeding to fork boundary tests)"
     fi
 }

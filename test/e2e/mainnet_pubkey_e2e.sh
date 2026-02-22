@@ -62,6 +62,12 @@ TESTS_TOTAL=0
 assert_eq() {
     local desc="$1" expected="$2" actual="$3"
     TESTS_TOTAL=$((TESTS_TOTAL + 1))
+    # Guard: both empty is a likely RPC/docker error, not a real match
+    if [ -z "$expected" ] && [ -z "$actual" ]; then
+        echo -e "  ${RED}FAIL${NC}: $desc (both values empty — likely RPC error)"
+        TESTS_FAILED=$((TESTS_FAILED + 1))
+        return 1
+    fi
     if [ "$expected" = "$actual" ]; then
         echo -e "  ${GREEN}PASS${NC}: $desc"
         TESTS_PASSED=$((TESTS_PASSED + 1))
@@ -90,6 +96,12 @@ assert_contains() {
 assert_ge() {
     local desc="$1" threshold="$2" actual="$3"
     TESTS_TOTAL=$((TESTS_TOTAL + 1))
+    # Guard: empty or non-numeric actual is a failure
+    if [ -z "$actual" ] || ! [ "$actual" -eq "$actual" ] 2>/dev/null; then
+        echo -e "  ${RED}FAIL${NC}: $desc (got non-numeric value: '${actual}')"
+        TESTS_FAILED=$((TESTS_FAILED + 1))
+        return 1
+    fi
     if [ "$actual" -ge "$threshold" ] 2>/dev/null; then
         echo -e "  ${GREEN}PASS${NC}: $desc"
         TESTS_PASSED=$((TESTS_PASSED + 1))
@@ -357,6 +369,12 @@ CONFEOF
         assert_ge "node reached height >= 15" 15 "$h"
 
         # Assertion 2: Post-fork blocks have zero coinbase
+        # Guard: if no post-fork blocks exist, fail explicitly
+        if [ "$h" -le "$FORK_HEIGHT" ]; then
+            echo -e "  ${RED}FAIL${NC}: no post-fork blocks to check (height ${h} <= fork ${FORK_HEIGHT})"
+            TESTS_TOTAL=$((TESTS_TOTAL + 2))
+            TESTS_FAILED=$((TESTS_FAILED + 2))
+        else
         all_zero=true
         for blk in $(seq $((FORK_HEIGHT + 1)) "$h"); do
             blockhash=$(acli 1 "$REGTEST_CHAIN" "$REGTEST_RPC_PORT" getblockhash "$blk")
@@ -394,6 +412,7 @@ CONFEOF
             echo -e "  ${RED}FAIL${NC}: some post-fork blocks missing SIGNET_HEADER"
             TESTS_FAILED=$((TESTS_FAILED + 1))
         fi
+        fi  # end of post-fork block guard
     fi
 
     docker rm -f "${CONTAINER_PREFIX}1" >/dev/null 2>&1 || true
@@ -561,6 +580,13 @@ CONFEOF
 echo ""
 echo "======================================"
 echo -e "  Tests passed: ${GREEN}${TESTS_PASSED}${NC} / ${TESTS_TOTAL}"
+# Counter integrity check
+expected_total=$((TESTS_PASSED + TESTS_FAILED))
+if [ "$TESTS_TOTAL" -ne "$expected_total" ]; then
+    echo -e "  ${RED}ERROR: counter mismatch! total=${TESTS_TOTAL} but passed+failed=${expected_total}${NC}"
+    echo "======================================"
+    exit 1
+fi
 if [ "$TESTS_FAILED" -gt 0 ]; then
     echo -e "  Tests failed: ${RED}${TESTS_FAILED}${NC}"
     echo "======================================"
