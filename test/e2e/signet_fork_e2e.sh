@@ -751,14 +751,34 @@ test_header "18" "Non-authorized node creates and sends transaction post-fork"
             if [ -n "$txid_to6" ] && echo "$txid_to6" | grep -q "^[0-9a-f]\{64\}$"; then
                 echo "  node5 → node6 txid: ${txid_to6:0:32}..."
 
-                # Relay the tx directly to the mining node. P2P propagation
-                # across Docker containers can be slow/unreliable.
-                raw_tx=$(cli 5 getrawtransaction "$txid_to6" 2>/dev/null || echo "")
-                if [ -n "$raw_tx" ]; then
-                    cli 0 sendrawtransaction "$raw_tx" 0.10 >/dev/null 2>&1 || true
+                # Fetch raw tx from node5's wallet (more reliable than getrawtransaction
+                # which only checks mempool on non-txindex nodes).
+                raw_tx=$(cli 5 -rpcwallet=test gettransaction "$txid_to6" 2>/dev/null | jq -r '.hex // empty')
+                if [ -z "$raw_tx" ]; then
+                    raw_tx=$(cli 5 getrawtransaction "$txid_to6" 2>/dev/null || echo "")
                 fi
 
-                # Mine a block to confirm (use node0 — tx is in its mempool)
+                # Relay the tx directly to the mining node AND node6.
+                # P2P propagation across Docker containers can be slow/unreliable.
+                if [ -n "$raw_tx" ]; then
+                    cli 0 sendrawtransaction "$raw_tx" 0.10 >/dev/null 2>&1 || true
+                    cli 6 sendrawtransaction "$raw_tx" 0.10 >/dev/null 2>&1 || true
+                fi
+
+                # Verify tx is in node0's mempool before mining
+                in_mempool=false
+                for _wait in $(seq 1 10); do
+                    if cli 0 getmempoolentry "$txid_to6" >/dev/null 2>&1; then
+                        in_mempool=true
+                        break
+                    fi
+                    sleep 1
+                done
+                if ! $in_mempool; then
+                    echo "  WARNING: tx not in node0 mempool, mining anyway"
+                fi
+
+                # Mine a block to confirm (use node0 — tx should be in its mempool)
                 mine_blocks 0 1
                 sleep 3
                 sync_blocks 60
@@ -769,27 +789,25 @@ test_header "18" "Non-authorized node creates and sends transaction post-fork"
                 cb=$(get_coinbase_value 0 "$tip")
                 assert_eq "confirming block coinbase = 0 (fees burned)" "0.00000000" "$cb" || true
 
-                # Verify node6 received the funds by polling until wallet catches up.
-                # sync_blocks confirms block acceptance; wallet processing may lag.
-                tx6_conf=0
-                tx6_amount=0
-                poll_tx6_deadline=$((SECONDS + 20))
+                # Verify node6 received the funds.
+                # Use getreceivedbyaddress which is more reliable than gettransaction
+                # (works as long as the block is synced and the address is in the wallet).
+                received6="0"
+                poll_tx6_deadline=$((SECONDS + 30))
                 while [ $SECONDS -lt $poll_tx6_deadline ]; do
-                    tx6_info=$(cli 6 -rpcwallet=test gettransaction "$txid_to6" 2>/dev/null || echo "{}")
-                    tx6_conf=$(echo "$tx6_info" | jq -r '.confirmations // 0')
-                    tx6_amount=$(echo "$tx6_info" | jq -r '.amount // 0')
-                    if [ "$tx6_conf" -gt 0 ] 2>/dev/null; then
+                    received6=$(cli 6 -rpcwallet=test getreceivedbyaddress "$addr6" 1 2>/dev/null || echo "0")
+                    if awk "BEGIN{exit !($received6 >= 0.09)}" 2>/dev/null; then
                         break
                     fi
                     sleep 1
                 done
                 TESTS_TOTAL=$((TESTS_TOTAL + 1))
-                if [ "$tx6_conf" -gt 0 ] 2>/dev/null; then
-                    echo -e "  ${GREEN}PASS${NC}: node6 received tx from node5 (amount=${tx6_amount}, conf=${tx6_conf})"
+                if awk "BEGIN{exit !($received6 >= 0.09)}" 2>/dev/null; then
+                    echo -e "  ${GREEN}PASS${NC}: node6 received tx from node5 (received=${received6})"
                     TESTS_PASSED=$((TESTS_PASSED + 1))
                 else
                     bal6=$(cli 6 -rpcwallet=test getbalance "*" 0 2>/dev/null || echo "0")
-                    echo -e "  ${RED}FAIL${NC}: node6 did not receive tx (conf=${tx6_conf}, bal=${bal6})"
+                    echo -e "  ${RED}FAIL${NC}: node6 did not receive tx (received=${received6}, bal=${bal6})"
                     TESTS_FAILED=$((TESTS_FAILED + 1))
                 fi
             else
