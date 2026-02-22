@@ -171,6 +171,12 @@ dist/
 .env
 .env.*
 
+# Claude Code project instructions
+CLAUDE.md
+
 # Local build artifacts and config
 build-output/
 config/
+
+# Claude artifacts
+CLAUDE.md
