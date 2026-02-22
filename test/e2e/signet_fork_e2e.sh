@@ -438,7 +438,7 @@ test_header "12" "Single-input transaction restriction"
             signed_hex=$(echo "$signed" | jq -r '.hex // empty')
             if [ -n "$signed_hex" ]; then
                 send_result=$(cli 0 -rpcwallet=test sendrawtransaction "$signed_hex" 2>&1) || true
-                assert_contains "multi-input tx rejected" "bad-txns-too-many-inputs|too-many-inputs|TX rejected" "$send_result" || true
+                assert_contains "multi-input tx rejected" "bad-txns-too-many-inputs|too-many-inputs" "$send_result" || true
             else
                 assert_contains "multi-input tx signing failed or rejected" "bad-txns-too-many-inputs|too-many-inputs" "$signed" || true
             fi
@@ -1147,7 +1147,14 @@ CONFEOF
 
         # Assertion 2: node0 received the mined blocks
         h0_after=$(get_height 0)
-        assert_ge "node0 synced integrated-miner blocks" "$h_after" "$h0_after" || true
+        TESTS_TOTAL=$((TESTS_TOTAL + 1))
+        if [ "$h_after" -gt "$h_before" ] && [ "$h0_after" -ge "$h_after" ]; then
+            echo -e "  ${GREEN}PASS${NC}: node0 synced integrated-miner blocks"
+            TESTS_PASSED=$((TESTS_PASSED + 1))
+        else
+            echo -e "  ${RED}FAIL${NC}: node0 did not sync integrated-miner blocks (h_before=${h_before}, h_after=${h_after}, h0_after=${h0_after})"
+            TESTS_FAILED=$((TESTS_FAILED + 1))
+        fi
 
         # Assertion 3: All new blocks have zero coinbase
         all_zero=true

@@ -79,6 +79,7 @@ sync_blocks() {
         for i in $(seq 0 $((NUM_NODES - 1))); do
             local h
             h=$(get_best_hash "$i" 2>/dev/null) || { ok=false; break; }
+            if [ -z "$h" ]; then ok=false; break; fi
             hashes+=("$h")
         done
         if $ok; then
@@ -109,6 +110,7 @@ sync_specific_nodes() {
         for i in "${nodes[@]}"; do
             local h
             h=$(get_best_hash "$i" 2>/dev/null) || { ok=false; break; }
+            if [ -z "$h" ]; then ok=false; break; fi
             hashes+=("$h")
         done
         if $ok; then

@@ -76,7 +76,7 @@ assert_eq() {
 assert_contains() {
     local desc="$1" needle="$2" haystack="$3"
     TESTS_TOTAL=$((TESTS_TOTAL + 1))
-    if echo "$haystack" | grep -q "$needle"; then
+    if echo "$haystack" | grep -qE "$needle"; then
         echo -e "  ${GREEN}PASS${NC}: $desc"
         TESTS_PASSED=$((TESTS_PASSED + 1))
     else
@@ -381,8 +381,8 @@ CONFEOF
         for blk in $(seq $((FORK_HEIGHT + 1)) "$h"); do
             blockhash=$(acli 1 "$REGTEST_CHAIN" "$REGTEST_RPC_PORT" getblockhash "$blk")
             cb_hex=$(acli 1 "$REGTEST_CHAIN" "$REGTEST_RPC_PORT" getblock "$blockhash" 2 | jq -r '.tx[0].hex // empty')
-            if [ -n "$cb_hex" ] && ! echo "$cb_hex" | grep -qi "ecc7daa2"; then
-                echo "    block ${blk}: missing SIGNET_HEADER"
+            if [ -z "$cb_hex" ] || ! echo "$cb_hex" | grep -qi "ecc7daa2"; then
+                echo "    block ${blk}: missing SIGNET_HEADER (cb_hex='${cb_hex:0:20}')"
                 all_signed=false
             fi
         done
@@ -436,7 +436,17 @@ CONFEOF
     logs=$(docker logs "${CONTAINER_PREFIX}2" 2>&1 || echo "")
     container_running=$(docker inspect -f '{{.State.Running}}' "${CONTAINER_PREFIX}2" 2>/dev/null || echo "false")
 
-    assert_contains "alphad rejected -signetforkheight on mainnet" "not allowed on mainnet" "$logs"
+    # Joint check: BOTH rejection message AND container stopped required
+    TESTS_TOTAL=$((TESTS_TOTAL + 1))
+    if echo "$logs" | grep -qE "not allowed on mainnet" && [ "$container_running" = "false" ]; then
+        echo -e "  ${GREEN}PASS${NC}: alphad rejected -signetforkheight on mainnet"
+        TESTS_PASSED=$((TESTS_PASSED + 1))
+    else
+        echo -e "  ${RED}FAIL${NC}: expected rejection message AND container exit"
+        echo -e "    container_running=${container_running}"
+        echo -e "    logs (last 200): ${logs:0:200}"
+        TESTS_FAILED=$((TESTS_FAILED + 1))
+    fi
 
     TESTS_TOTAL=$((TESTS_TOTAL + 1))
     if [ "$container_running" = "false" ]; then
