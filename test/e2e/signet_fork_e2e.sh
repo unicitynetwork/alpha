@@ -788,22 +788,36 @@ test_header "18" "Non-authorized node creates and sends transaction post-fork"
 
                 # Relay the tx directly to the mining node AND node6.
                 # P2P propagation across Docker containers can be slow/unreliable.
+                # Use maxfeerate=0 to avoid fee-rate rejection on relay.
+                in_mempool=false
                 if [ -n "$raw_tx" ]; then
-                    cli 0 sendrawtransaction "$raw_tx" 0.10 >/dev/null 2>&1 || true
-                    cli 6 sendrawtransaction "$raw_tx" 0.10 >/dev/null 2>&1 || true
+                    for _relay_attempt in $(seq 1 3); do
+                        cli 0 sendrawtransaction "$raw_tx" 0 >/dev/null 2>&1 || true
+                        cli 6 sendrawtransaction "$raw_tx" 0 >/dev/null 2>&1 || true
+                        sleep 2
+                        if cli 0 getmempoolentry "$txid_to6" >/dev/null 2>&1; then
+                            in_mempool=true
+                            break
+                        fi
+                        # Also try relaying via other auth nodes as fallback
+                        for _relay_node in 1 2 3 4; do
+                            cli "$_relay_node" sendrawtransaction "$raw_tx" 0 >/dev/null 2>&1 || true
+                        done
+                    done
                 fi
 
-                # Verify tx is in node0's mempool before mining
-                in_mempool=false
-                for _wait in $(seq 1 10); do
-                    if cli 0 getmempoolentry "$txid_to6" >/dev/null 2>&1; then
-                        in_mempool=true
-                        break
-                    fi
-                    sleep 1
-                done
+                # Final mempool check with extended wait
                 if ! $in_mempool; then
-                    echo "  WARNING: tx not in node0 mempool, mining anyway"
+                    for _wait in $(seq 1 10); do
+                        if cli 0 getmempoolentry "$txid_to6" >/dev/null 2>&1; then
+                            in_mempool=true
+                            break
+                        fi
+                        sleep 1
+                    done
+                fi
+                if ! $in_mempool; then
+                    echo "  WARNING: tx not in node0 mempool after all relay attempts"
                 fi
 
                 # Mine a block to confirm (use node0 — tx should be in its mempool)
