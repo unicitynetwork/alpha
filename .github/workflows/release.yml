@@ -32,13 +32,13 @@ jobs:
       - name: Determine version
         id: version
         run: |
-          MAJOR=$(grep 'define(_ALPHA_CLIENT_VERSION_MAJOR' configure.ac | grep -o '[0-9]*')
-          MINOR=$(grep 'define(_ALPHA_CLIENT_VERSION_MINOR' configure.ac | grep -o '[0-9]*')
-          BUILD=$(grep 'define(_ALPHA_CLIENT_VERSION_BUILD' configure.ac | grep -o '[0-9]*')
-          CODENAME=$(grep '_ALPHA_CLIENT_RELEASE_NAME_MAJOR' configure.ac | sed 's/.*\[\(.*\)\].*/\1/')
-          CORE_MAJOR=$(grep 'define(_CLIENT_VERSION_MAJOR' configure.ac | grep -o '[0-9]*')
-          CORE_MINOR=$(grep 'define(_CLIENT_VERSION_MINOR' configure.ac | grep -o '[0-9]*')
-          CORE_BUILD=$(grep 'define(_CLIENT_VERSION_BUILD' configure.ac | grep -o '[0-9]*')
+          MAJOR=$(grep '^define(_ALPHA_CLIENT_VERSION_MAJOR' configure.ac | head -1 | grep -o '[0-9]*')
+          MINOR=$(grep '^define(_ALPHA_CLIENT_VERSION_MINOR' configure.ac | head -1 | grep -o '[0-9]*')
+          BUILD=$(grep '^define(_ALPHA_CLIENT_VERSION_BUILD' configure.ac | head -1 | grep -o '[0-9]*')
+          CODENAME=$(grep '^define(_ALPHA_CLIENT_RELEASE_NAME_MAJOR' configure.ac | head -1 | sed 's/.*\[\(.*\)\].*/\1/')
+          CORE_MAJOR=$(grep '^define(_CLIENT_VERSION_MAJOR' configure.ac | grep -v ALPHA | head -1 | grep -o '[0-9]*')
+          CORE_MINOR=$(grep '^define(_CLIENT_VERSION_MINOR' configure.ac | grep -v ALPHA | head -1 | grep -o '[0-9]*')
+          CORE_BUILD=$(grep '^define(_CLIENT_VERSION_BUILD' configure.ac | grep -v ALPHA | head -1 | grep -o '[0-9]*')
           PKG_VERSION="${MAJOR}.${MINOR}.${BUILD}-${CODENAME}-core-${CORE_MAJOR}.${CORE_MINOR}.${CORE_BUILD}"
           echo "PKG_VERSION=${PKG_VERSION}" >> $GITHUB_OUTPUT
           echo "Package version: ${PKG_VERSION}"
@@ -114,13 +114,13 @@ jobs:
       - name: Determine version
         id: version
         run: |
-          MAJOR=$(grep 'define(_ALPHA_CLIENT_VERSION_MAJOR' configure.ac | grep -o '[0-9]*')
-          MINOR=$(grep 'define(_ALPHA_CLIENT_VERSION_MINOR' configure.ac | grep -o '[0-9]*')
-          BUILD=$(grep 'define(_ALPHA_CLIENT_VERSION_BUILD' configure.ac | grep -o '[0-9]*')
-          CODENAME=$(grep '_ALPHA_CLIENT_RELEASE_NAME_MAJOR' configure.ac | sed 's/.*\[\(.*\)\].*/\1/')
-          CORE_MAJOR=$(grep 'define(_CLIENT_VERSION_MAJOR' configure.ac | grep -o '[0-9]*')
-          CORE_MINOR=$(grep 'define(_CLIENT_VERSION_MINOR' configure.ac | grep -o '[0-9]*')
-          CORE_BUILD=$(grep 'define(_CLIENT_VERSION_BUILD' configure.ac | grep -o '[0-9]*')
+          MAJOR=$(grep '^define(_ALPHA_CLIENT_VERSION_MAJOR' configure.ac | head -1 | grep -o '[0-9]*')
+          MINOR=$(grep '^define(_ALPHA_CLIENT_VERSION_MINOR' configure.ac | head -1 | grep -o '[0-9]*')
+          BUILD=$(grep '^define(_ALPHA_CLIENT_VERSION_BUILD' configure.ac | head -1 | grep -o '[0-9]*')
+          CODENAME=$(grep '^define(_ALPHA_CLIENT_RELEASE_NAME_MAJOR' configure.ac | head -1 | sed 's/.*\[\(.*\)\].*/\1/')
+          CORE_MAJOR=$(grep '^define(_CLIENT_VERSION_MAJOR' configure.ac | grep -v ALPHA | head -1 | grep -o '[0-9]*')
+          CORE_MINOR=$(grep '^define(_CLIENT_VERSION_MINOR' configure.ac | grep -v ALPHA | head -1 | grep -o '[0-9]*')
+          CORE_BUILD=$(grep '^define(_CLIENT_VERSION_BUILD' configure.ac | grep -v ALPHA | head -1 | grep -o '[0-9]*')
           PKG_VERSION="${MAJOR}.${MINOR}.${BUILD}-${CODENAME}-core-${CORE_MAJOR}.${CORE_MINOR}.${CORE_BUILD}"
           echo "PKG_VERSION=${PKG_VERSION}" >> $GITHUB_OUTPUT
 
@@ -190,13 +190,13 @@ jobs:
       - name: Determine version
         id: version
         run: |
-          MAJOR=$(grep 'define(_ALPHA_CLIENT_VERSION_MAJOR' configure.ac | grep -o '[0-9]*')
-          MINOR=$(grep 'define(_ALPHA_CLIENT_VERSION_MINOR' configure.ac | grep -o '[0-9]*')
-          BUILD=$(grep 'define(_ALPHA_CLIENT_VERSION_BUILD' configure.ac | grep -o '[0-9]*')
-          CODENAME=$(grep '_ALPHA_CLIENT_RELEASE_NAME_MAJOR' configure.ac | sed 's/.*\[\(.*\)\].*/\1/')
-          CORE_MAJOR=$(grep 'define(_CLIENT_VERSION_MAJOR' configure.ac | grep -o '[0-9]*')
-          CORE_MINOR=$(grep 'define(_CLIENT_VERSION_MINOR' configure.ac | grep -o '[0-9]*')
-          CORE_BUILD=$(grep 'define(_CLIENT_VERSION_BUILD' configure.ac | grep -o '[0-9]*')
+          MAJOR=$(grep '^define(_ALPHA_CLIENT_VERSION_MAJOR' configure.ac | head -1 | grep -o '[0-9]*')
+          MINOR=$(grep '^define(_ALPHA_CLIENT_VERSION_MINOR' configure.ac | head -1 | grep -o '[0-9]*')
+          BUILD=$(grep '^define(_ALPHA_CLIENT_VERSION_BUILD' configure.ac | head -1 | grep -o '[0-9]*')
+          CODENAME=$(grep '^define(_ALPHA_CLIENT_RELEASE_NAME_MAJOR' configure.ac | head -1 | sed 's/.*\[\(.*\)\].*/\1/')
+          CORE_MAJOR=$(grep '^define(_CLIENT_VERSION_MAJOR' configure.ac | grep -v ALPHA | head -1 | grep -o '[0-9]*')
+          CORE_MINOR=$(grep '^define(_CLIENT_VERSION_MINOR' configure.ac | grep -v ALPHA | head -1 | grep -o '[0-9]*')
+          CORE_BUILD=$(grep '^define(_CLIENT_VERSION_BUILD' configure.ac | grep -v ALPHA | head -1 | grep -o '[0-9]*')
           PKG_VERSION="${MAJOR}.${MINOR}.${BUILD}-${CODENAME}-core-${CORE_MAJOR}.${CORE_MINOR}.${CORE_BUILD}"
           echo "PKG_VERSION=${PKG_VERSION}" >> $GITHUB_OUTPUT
 
