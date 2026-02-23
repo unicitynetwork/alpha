@@ -72,6 +72,7 @@ jobs:
           cp depends/x86_64-pc-linux-gnu/bin/alpha-tx "${ARTIFACT_NAME}/bin/"
           cp depends/x86_64-pc-linux-gnu/bin/alpha-wallet "${ARTIFACT_NAME}/bin/"
           cp depends/x86_64-pc-linux-gnu/bin/alpha-util "${ARTIFACT_NAME}/bin/"
+          strip "${ARTIFACT_NAME}/bin/"*
           cp COPYING "${ARTIFACT_NAME}/"
           tar czf "${ARTIFACT_NAME}.tgz" "${ARTIFACT_NAME}"
           echo "ARTIFACT=${ARTIFACT_NAME}.tgz" >> $GITHUB_ENV
@@ -154,6 +155,7 @@ jobs:
           cp depends/x86_64-w64-mingw32/bin/alpha-tx.exe "${ARTIFACT_NAME}/"
           cp depends/x86_64-w64-mingw32/bin/alpha-wallet.exe "${ARTIFACT_NAME}/"
           cp depends/x86_64-w64-mingw32/bin/alpha-util.exe "${ARTIFACT_NAME}/"
+          x86_64-w64-mingw32-strip "${ARTIFACT_NAME}/"*.exe
           cp COPYING "${ARTIFACT_NAME}/"
           zip -r "${ARTIFACT_NAME}.zip" "${ARTIFACT_NAME}"
           echo "ARTIFACT=${ARTIFACT_NAME}.zip" >> $GITHUB_ENV
@@ -231,6 +233,7 @@ jobs:
           cp depends/${MACOS_HOST}/bin/alpha-tx "${ARTIFACT_NAME}/bin/"
           cp depends/${MACOS_HOST}/bin/alpha-wallet "${ARTIFACT_NAME}/bin/"
           cp depends/${MACOS_HOST}/bin/alpha-util "${ARTIFACT_NAME}/bin/"
+          strip "${ARTIFACT_NAME}/bin/"*
           cp COPYING "${ARTIFACT_NAME}/"
           zip -r "${ARTIFACT_NAME}.zip" "${ARTIFACT_NAME}"
           echo "ARTIFACT=${ARTIFACT_NAME}.zip" >> $GITHUB_ENV
