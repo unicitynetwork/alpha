@@ -45,7 +45,7 @@ jobs:
           fi
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
           REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-          echo "IMAGE_NAME=ghcr.io/${REPO_LOWER}/alpha" >> $GITHUB_ENV
+          echo "IMAGE_NAME=ghcr.io/${REPO_LOWER}" >> $GITHUB_ENV
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
@@ -59,13 +59,3 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Update Docker Hub description
-        uses: peter-evans/dockerhub-description@v3
-        if: github.event_name == 'release'
-        with:
-          registry: ghcr.io
-          repository: ${{ github.repository_owner }}/alpha
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-          short-description: "Alpha cryptocurrency node"
-          readme-filepath: ./docker/README.md

@@ -9,7 +9,7 @@ define(_COPYRIGHT_HOLDERS,[The %s developers])
 define(_COPYRIGHT_HOLDERS_SUBSTITUTION,[[Bitcoin Core]])
 
 dnl !ALPHA
-define(_ALPHA_CLIENT_RELEASE_NAME_MAJOR, [dubai-experimental])
+define(_ALPHA_CLIENT_RELEASE_NAME_MAJOR, [dubai])
 define(_ALPHA_CLIENT_VERSION_MAJOR, 1)
 define(_ALPHA_CLIENT_VERSION_MINOR, 8)
 define(_ALPHA_CLIENT_VERSION_BUILD, 0)
