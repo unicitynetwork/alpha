@@ -6,6 +6,7 @@
 #ifndef BITCOIN_NODE_MINER_H
 #define BITCOIN_NODE_MINER_H
 
+#include <key.h>
 #include <policy/policy.h>
 #include <primitives/block.h>
 #include <txmempool.h>
@@ -28,6 +29,14 @@ class Chainstate;
 class ChainstateManager;
 
 namespace Consensus { struct Params; };
+
+// !ALPHA SIGNET FORK
+/** Global signing key for post-fork authorized block production.
+ *  Set during AppInitMain from -signetblockkey config parameter.
+ *  Only valid when the node is in template-serving mode.
+ */
+extern CKey g_alpha_signet_key;
+// !ALPHA SIGNET FORK END
 
 namespace node {
 static const bool DEFAULT_PRINTPRIORITY = false;

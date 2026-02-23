@@ -23,7 +23,7 @@
 #include <uint256.h>
 #include <util/strencodings.h>
 
-static constexpr uint8_t SIGNET_HEADER[4] = {0xec, 0xc7, 0xda, 0xa2};
+// SIGNET_HEADER is now defined in signet.h (inline constexpr)
 
 static constexpr unsigned int BLOCK_SCRIPT_VERIFY_FLAGS = SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_WITNESS | SCRIPT_VERIFY_DERSIG | SCRIPT_VERIFY_NULLDUMMY;
 
@@ -120,19 +120,18 @@ std::optional<SignetTxs> SignetTxs::Create(const CBlock& block, const CScript& c
     return SignetTxs{tx_to_spend, tx_spending};
 }
 
-// Signet block solution checker
-bool CheckSignetBlockSolution(const CBlock& block, const Consensus::Params& consensusParams)
+/**
+ * Shared verification kernel: constructs the signet transaction pair from the
+ * block and challenge, then verifies the script signature.
+ * Returns true if the block's signet signature satisfies the challenge.
+ */
+static bool VerifySignetChallenge(const CBlock& block, const std::vector<uint8_t>& challenge)
 {
-    if (block.GetHash() == consensusParams.hashGenesisBlock) {
-        // genesis block solution is always valid
-        return true;
-    }
-
-    const CScript challenge(consensusParams.signet_challenge.begin(), consensusParams.signet_challenge.end());
-    const std::optional<SignetTxs> signet_txs = SignetTxs::Create(block, challenge);
+    const CScript script_challenge(challenge.begin(), challenge.end());
+    const std::optional<SignetTxs> signet_txs = SignetTxs::Create(block, script_challenge);
 
     if (!signet_txs) {
-        LogPrint(BCLog::VALIDATION, "CheckSignetBlockSolution: Errors in block (block solution parse failure)\n");
+        LogPrint(BCLog::VALIDATION, "VerifySignetChallenge: SignetTxs::Create failed (parse error or missing witness commitment)\n");
         return false;
     }
 
@@ -141,11 +140,80 @@ bool CheckSignetBlockSolution(const CBlock& block, const Consensus::Params& cons
 
     PrecomputedTransactionData txdata;
     txdata.Init(signet_txs->m_to_sign, {signet_txs->m_to_spend.vout[0]});
-    TransactionSignatureChecker sigcheck(&signet_txs->m_to_sign, /* nInIn= */ 0, /* amountIn= */ signet_txs->m_to_spend.vout[0].nValue, txdata, MissingDataBehavior::ASSERT_FAIL);
+    TransactionSignatureChecker sigcheck(&signet_txs->m_to_sign, /*nInIn=*/ 0, /*amountIn=*/ signet_txs->m_to_spend.vout[0].nValue, txdata, MissingDataBehavior::ASSERT_FAIL);
 
-    if (!VerifyScript(scriptSig, signet_txs->m_to_spend.vout[0].scriptPubKey, &witness, BLOCK_SCRIPT_VERIFY_FLAGS, sigcheck)) {
+    return VerifyScript(scriptSig, signet_txs->m_to_spend.vout[0].scriptPubKey, &witness, BLOCK_SCRIPT_VERIFY_FLAGS, sigcheck);
+}
+
+// Signet block solution checker (native BIP325 -- used when signet_blocks=true)
+bool CheckSignetBlockSolution(const CBlock& block, const Consensus::Params& consensusParams)
+{
+    if (block.GetHash() == consensusParams.hashGenesisBlock) {
+        // genesis block solution is always valid
+        return true;
+    }
+
+    if (!VerifySignetChallenge(block, consensusParams.signet_challenge)) {
         LogPrint(BCLog::VALIDATION, "CheckSignetBlockSolution: Errors in block (block solution invalid)\n");
         return false;
     }
     return true;
 }
+
+// !ALPHA SIGNET FORK
+std::vector<CPubKey> ExtractPubkeysFromChallenge(const std::vector<uint8_t>& challenge)
+{
+    std::vector<CPubKey> result;
+    CScript script(challenge.begin(), challenge.end());
+    opcodetype opcode;
+    std::vector<uint8_t> pushdata;
+    CScript::const_iterator pc = script.begin();
+    while (script.GetOp(pc, opcode, pushdata)) {
+        if (pushdata.size() == CPubKey::COMPRESSED_SIZE) {
+            CPubKey pk(pushdata);
+            if (pk.IsFullyValid()) {
+                result.push_back(pk);
+            }
+        }
+    }
+    return result;
+}
+
+bool CheckSignetBlockSolution(const CBlock& block, const Consensus::Params& consensusParams, int nHeight)
+{
+    // Only enforce after activation height
+    if (consensusParams.nSignetActivationHeight <= 0 || nHeight < consensusParams.nSignetActivationHeight) {
+        return true;  // Pre-fork: no authorization required
+    }
+
+    if (consensusParams.signet_challenge.empty()) {
+        LogPrint(BCLog::VALIDATION, "CheckSignetBlockSolution (Alpha fork): no challenge configured at height %d\n", nHeight);
+        return false;
+    }
+
+    // Explicit SIGNET_HEADER check — reject blocks without it
+    if (block.vtx.empty()) return false;
+    const int cidx = GetWitnessCommitmentIndex(block);
+    if (cidx == NO_WITNESS_COMMITMENT) {
+        LogPrint(BCLog::VALIDATION, "CheckSignetBlockSolution (Alpha fork): no witness commitment at height %d\n", nHeight);
+        return false;
+    }
+    {
+        // Work on a copy — FetchAndClearCommitmentSection mutates its argument
+        CScript commitment_copy = block.vtx[0]->vout.at(cidx).scriptPubKey;
+        std::vector<uint8_t> dummy;
+        if (!FetchAndClearCommitmentSection(SIGNET_HEADER, commitment_copy, dummy)) {
+            LogPrint(BCLog::VALIDATION, "CheckSignetBlockSolution (Alpha fork): "
+                "missing SIGNET_HEADER at height %d\n", nHeight);
+            return false;
+        }
+    }
+
+    // Standard signet verification using shared helper
+    if (!VerifySignetChallenge(block, consensusParams.signet_challenge)) {
+        LogPrint(BCLog::VALIDATION, "CheckSignetBlockSolution (Alpha fork): invalid block solution at height %d\n", nHeight);
+        return false;
+    }
+    return true;
+}
+// !ALPHA SIGNET FORK END

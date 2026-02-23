@@ -8,13 +8,33 @@
 #include <consensus/params.h>
 #include <primitives/block.h>
 #include <primitives/transaction.h>
+#include <pubkey.h>
 
+#include <array>
+#include <cstdint>
 #include <optional>
+
+/** Four-byte magic header used to locate the signet commitment in the coinbase witness commitment. */
+inline constexpr uint8_t SIGNET_HEADER[4] = {0xec, 0xc7, 0xda, 0xa2};
 
 /**
  * Extract signature and check whether a block has a valid solution
  */
 bool CheckSignetBlockSolution(const CBlock& block, const Consensus::Params& consensusParams);
+
+// !ALPHA SIGNET FORK
+/**
+ * Height-gated variant: check signet block solution only if height >= activation height.
+ * Uses consensus.signet_challenge (safe because signet_blocks=false on Alpha chains).
+ */
+bool CheckSignetBlockSolution(const CBlock& block, const Consensus::Params& consensusParams, int nHeight);
+
+/**
+ * Extract compressed pubkeys from a challenge script (e.g. bare multisig).
+ * Returns all valid 33-byte compressed pubkeys found as push data in the script.
+ */
+std::vector<CPubKey> ExtractPubkeysFromChallenge(const std::vector<uint8_t>& challenge);
+// !ALPHA SIGNET FORK END
 
 /**
  * Generate the signet tx corresponding to the given block

@@ -12,6 +12,7 @@
 #include <net_processing.h>
 #include <netgroup.h>
 #include <node/kernel_notifications.h>
+#include <node/mining_thread.h>
 #include <policy/fees.h>
 #include <scheduler.h>
 #include <txmempool.h>

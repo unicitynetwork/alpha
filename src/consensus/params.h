@@ -180,6 +180,12 @@ struct Params {
     uint32_t RandomX_DiffMult;
     // !ALPHA END
 
+    // !ALPHA SIGNET FORK
+    int nSignetActivationHeight{0};              // Height at which signet authorization activates (0 = never)
+    // Challenge script stored in signet_challenge (safe because signet_blocks=false on Alpha chains,
+    // so native BIP325 code paths never read it)
+    // !ALPHA SIGNET FORK END
+
     // !SCASH END
 };
 

@@ -841,6 +841,10 @@ static RPCHelpMan getblocktemplate()
 
     // Update nTime
     UpdateTime(pblock, consensusParams, pindexPrev);
+    // Recalculate nBits after time update. When fPowAllowMinDifficultyBlocks
+    // is true the required work depends on the block timestamp, so nBits must
+    // be refreshed whenever nTime changes (e.g. on cached templates).
+    pblock->nBits = GetNextWorkRequired(pindexPrev, pblock, consensusParams);
     pblock->nNonce = 0;
 
     // NOTE: If at some point we support pre-segwit miners post-segwit-activation, this needs to take segwit support into consideration
@@ -956,6 +960,21 @@ static RPCHelpMan getblocktemplate()
     result.pushKV("transactions", transactions);
     result.pushKV("coinbaseaux", aux);
     result.pushKV("coinbasevalue", (int64_t)pblock->vtx[0]->vout[0].nValue);
+
+    // !ALPHA SIGNET FORK - Include pre-signed coinbase for external miners.
+    // Post-fork, CreateNewBlock() embeds a SIGNET_HEADER signature in the
+    // coinbase witness commitment. External miners must use this coinbase
+    // as-is (via BIP22 coinbasetxn) rather than constructing their own.
+    // "data" is the full witness serialization (preserves SIGNET_HEADER).
+    // "txid" is the non-witness hash for the block merkle root.
+    if (g_isAlpha && consensusParams.nSignetActivationHeight > 0
+        && (pindexPrev->nHeight + 1) >= consensusParams.nSignetActivationHeight) {
+        UniValue coinbasetxn(UniValue::VOBJ);
+        coinbasetxn.pushKV("data", EncodeHexTx(*pblock->vtx[0]));
+        coinbasetxn.pushKV("txid", pblock->vtx[0]->GetHash().GetHex());
+        result.pushKV("coinbasetxn", coinbasetxn);
+    }
+
     result.pushKV("longpollid", active_chain.Tip()->GetBlockHash().GetHex() + ToString(nTransactionsUpdatedLast));
     result.pushKV("target", hashTarget.GetHex());
     result.pushKV("mintime", (int64_t)pindexPrev->GetMedianTimePast()+1);
@@ -981,6 +1000,7 @@ static RPCHelpMan getblocktemplate()
     if (consensusParams.signet_blocks) {
         result.pushKV("signet_challenge", HexStr(consensusParams.signet_challenge));
     }
+
 
     if (!pblocktemplate->vchCoinbaseCommitment.empty()) {
         result.pushKV("default_witness_commitment", HexStr(pblocktemplate->vchCoinbaseCommitment));

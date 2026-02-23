@@ -95,6 +95,15 @@
 #include <pow.h>
 // !SCASH END
 
+// !ALPHA SIGNET FORK
+#include <addresstype.h>
+#include <key.h>
+#include <key_io.h>
+#include <node/mining_thread.h>
+#include <script/script.h>
+#include <signet.h>
+// !ALPHA SIGNET FORK END
+
 #include <algorithm>
 #include <condition_variable>
 #include <cstdint>
@@ -296,6 +305,13 @@ void Shutdown(NodeContext& node)
         client->flush();
     }
     StopMapPort();
+
+    // !ALPHA INTEGRATED MINING
+    if (node.mining_ctx) {
+        node.mining_ctx->Stop();
+        node.mining_ctx.reset();
+    }
+    // !ALPHA INTEGRATED MINING END
 
     // Because these depend on each-other, we make sure that neither can be
     // using the other before destroying them.
@@ -682,6 +698,20 @@ void SetupServerArgs(ArgsManager& argsman)
     argsman.AddArg("-blockmaxweight=<n>", strprintf("Set maximum BIP141 block weight (default: %d)", DEFAULT_BLOCK_MAX_WEIGHT), ArgsManager::ALLOW_ANY, OptionsCategory::BLOCK_CREATION);
     argsman.AddArg("-blockmintxfee=<amt>", strprintf("Set lowest fee rate (in %s/kvB) for transactions to be included in block creation. (default: %s)", CURRENCY_UNIT, FormatMoney(DEFAULT_BLOCK_MIN_TX_FEE)), ArgsManager::ALLOW_ANY, OptionsCategory::BLOCK_CREATION);
     argsman.AddArg("-blockversion=<n>", "Override block version to test forking scenarios", ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::BLOCK_CREATION);
+
+    // !ALPHA SIGNET FORK
+    argsman.AddArg("-signetblockkey=<WIF>",
+        "WIF-encoded private key for signing blocks after fork activation height (Alpha mainnet only). "
+        "Required when -server is enabled and chain is at or near fork height. "
+        "MUST be set in alpha.conf, not on the command line.",
+        ArgsManager::ALLOW_ANY | ArgsManager::SENSITIVE, OptionsCategory::BLOCK_CREATION);
+    // !ALPHA SIGNET FORK END
+
+    // !ALPHA INTEGRATED MINING
+    argsman.AddArg("-mine", "Enable continuous background mining (default: false)", ArgsManager::ALLOW_ANY, OptionsCategory::BLOCK_CREATION);
+    argsman.AddArg("-mineaddress=<addr>", "Address for mining coinbase output (required when -mine is set)", ArgsManager::ALLOW_ANY, OptionsCategory::BLOCK_CREATION);
+    argsman.AddArg("-minethreads=<n>", "Number of mining threads (default: 1)", ArgsManager::ALLOW_ANY, OptionsCategory::BLOCK_CREATION);
+    // !ALPHA INTEGRATED MINING END
 
     argsman.AddArg("-rest", strprintf("Accept public REST requests (default: %u)", DEFAULT_REST_ENABLE), ArgsManager::ALLOW_ANY, OptionsCategory::RPC);
     argsman.AddArg("-rpcallowip=<ip>", "Allow JSON-RPC connections from specified source. Valid values for <ip> are a single IP (e.g. 1.2.3.4), a network/netmask (e.g. 1.2.3.4/255.255.255.0), a network/CIDR (e.g. 1.2.3.4/24), all ipv4 (0.0.0.0/0), or all ipv6 (::/0). This option can be specified multiple times", ArgsManager::ALLOW_ANY, OptionsCategory::RPC);
@@ -1211,7 +1241,34 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
         g_isAlpha = true;
         LogPrintf("%s: Alpha active\n", __func__);
     }
-    // !ALPHA END 
+    // !ALPHA END
+
+    // !ALPHA SIGNET FORK - Log fork parameters
+    if (g_isAlpha) {
+        const Consensus::Params& fp = chainparams.GetConsensus();
+        if (fp.nSignetActivationHeight > 0 && !fp.signet_challenge.empty()) {
+            LogPrintf("Alpha signet fork: activation height = %d\n", fp.nSignetActivationHeight);
+            LogPrintf("Alpha signet fork: challenge script = %s\n", HexStr(fp.signet_challenge));
+            std::vector<CPubKey> pubkeys = ExtractPubkeysFromChallenge(fp.signet_challenge);
+            LogPrintf("Alpha signet fork: %d authorized pubkey(s):\n", pubkeys.size());
+            for (size_t i = 0; i < pubkeys.size(); ++i) {
+                LogPrintf("  pubkey[%d]: %s\n", i, HexStr(pubkeys[i]));
+            }
+        } else {
+            LogPrintf("Alpha signet fork: disabled (height=%d)\n", fp.nSignetActivationHeight);
+        }
+        if (chainparams.GetChainType() == ChainType::ALPHAMAIN) {
+            if (args.IsArgSet("-signetforkheight")) {
+                return InitError(Untranslated("-signetforkheight is not allowed on mainnet. "
+                    "Mainnet uses hardcoded fork parameters that cannot be overridden."));
+            }
+            if (args.IsArgSet("-signetforkpubkeys")) {
+                return InitError(Untranslated("-signetforkpubkeys is not allowed on mainnet. "
+                    "Mainnet uses hardcoded fork parameters that cannot be overridden."));
+            }
+        }
+    }
+    // !ALPHA SIGNET FORK END
 
     assert(!(g_isAlpha && !g_isRandomX) && "g_isAlpha cannot be true if g_isRandomX is false");
 
@@ -1786,6 +1843,54 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
         }
     }
 
+    // !ALPHA SIGNET FORK - Validate signing key at startup
+    // If -signetblockkey is provided, always validate it against the authorized
+    // pubkeys regardless of -server mode or current chain height. This ensures
+    // operators discover misconfiguration immediately, not when the fork activates.
+    // If -signetblockkey is not set, that is fine — the node simply will not
+    // produce blocks.
+    if (g_isAlpha && chainman.GetConsensus().nSignetActivationHeight > 0) {
+        const Consensus::Params& forkParams = chainman.GetConsensus();
+        const std::string strKey = args.GetArg("-signetblockkey", "");
+
+        if (!strKey.empty()) {
+            // Parse the WIF key
+            CKey signingKey = DecodeSecret(strKey);
+            if (!signingKey.IsValid()) {
+                return InitError(_("Invalid -signetblockkey: failed to decode WIF private key."));
+            }
+
+            // Derive the public key
+            CPubKey signingPubKey = signingKey.GetPubKey();
+            if (!signingKey.VerifyPubKey(signingPubKey)) {
+                return InitError(_("Invalid -signetblockkey: public key derivation failed."));
+            }
+
+            // Extract authorized pubkeys from the challenge script using shared helper
+            std::vector<CPubKey> authorizedPubkeys = ExtractPubkeysFromChallenge(forkParams.signet_challenge);
+            bool keyAuthorized = false;
+            for (const auto& candidateKey : authorizedPubkeys) {
+                if (candidateKey == signingPubKey) {
+                    keyAuthorized = true;
+                    break;
+                }
+            }
+
+            if (!keyAuthorized) {
+                return InitError(strprintf(
+                    _("Configured -signetblockkey public key (%s) is NOT in the authorized allowlist. "
+                      "The key must correspond to one of the %d authorized pubkeys in the fork challenge script."),
+                    HexStr(signingPubKey), authorizedPubkeys.size()));
+            }
+
+            // Store the validated key globally
+            g_alpha_signet_key = signingKey;
+            LogPrintf("Alpha fork: signing key validated and loaded (pubkey: %s...)\n",
+                HexStr(signingPubKey).substr(0, 16));
+        }
+    }
+    // !ALPHA SIGNET FORK END
+
     // Either install a handler to notify us when genesis activates, or set fHaveGenesis directly.
     // No locking, as this happens before any background thread is started.
     boost::signals2::connection block_notify_genesis_wait_connection;
@@ -2047,6 +2152,24 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
 #if HAVE_SYSTEM
     StartupNotify(args);
 #endif
+
+    // !ALPHA INTEGRATED MINING
+    if (args.GetBoolArg("-mine", false)) {
+        std::string mine_addr = args.GetArg("-mineaddress", "");
+        if (mine_addr.empty()) {
+            return InitError(Untranslated("-mine requires -mineaddress=<addr>"));
+        }
+        CTxDestination dest = DecodeDestination(mine_addr);
+        if (!IsValidDestination(dest)) {
+            return InitError(strprintf(Untranslated("Invalid -mineaddress: %s"), mine_addr));
+        }
+
+        node.mining_ctx = std::make_unique<node::MiningContext>();
+        node.mining_ctx->coinbase_script = GetScriptForDestination(dest);
+        node.mining_ctx->num_threads = args.GetIntArg("-minethreads", 1);
+        node.mining_ctx->Start(*node.chainman, *node.mempool);
+    }
+    // !ALPHA INTEGRATED MINING END
 
     return true;
 }

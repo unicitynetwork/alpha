@@ -21,49 +21,75 @@
 
 BOOST_FIXTURE_TEST_SUITE(validation_tests, TestingSetup)
 
-static void TestBlockSubsidyHalvings(const Consensus::Params& consensusParams)
-{
-    int maxHalvings = 64;
-    CAmount nInitialSubsidy = 50 * COIN;
-
-    CAmount nPreviousSubsidy = nInitialSubsidy * 2; // for height == 0
-    BOOST_CHECK_EQUAL(nPreviousSubsidy, nInitialSubsidy * 2);
-    for (int nHalvings = 0; nHalvings < maxHalvings; nHalvings++) {
-        int nHeight = nHalvings * consensusParams.nSubsidyHalvingInterval;
-        CAmount nSubsidy = GetBlockSubsidy(nHeight, consensusParams);
-        BOOST_CHECK(nSubsidy <= nInitialSubsidy);
-        BOOST_CHECK_EQUAL(nSubsidy, nPreviousSubsidy / 2);
-        nPreviousSubsidy = nSubsidy;
-    }
-    BOOST_CHECK_EQUAL(GetBlockSubsidy(maxHalvings * consensusParams.nSubsidyHalvingInterval, consensusParams), 0);
-}
-
-static void TestBlockSubsidyHalvings(int nSubsidyHalvingInterval)
-{
-    Consensus::Params consensusParams;
-    consensusParams.nSubsidyHalvingInterval = nSubsidyHalvingInterval;
-    TestBlockSubsidyHalvings(consensusParams);
-}
-
+// Alpha subsidy schedule (actual network parameters):
+//   Blocks 0–399,999:      10 ALPHA (g_isAlpha = true)
+//   Blocks 400,000–449,999: 5 ALPHA (single halving at 400k)
+//   Blocks 450,000+:        0 ALPHA (signet fork, nSignetActivationHeight = 450,000)
+//
+// The original Bitcoin `nSubsidy >>= halvings` is commented out.
+// nSubsidyHalvingInterval is only used for the overflow guard (halvings >= 64 → 0).
 BOOST_AUTO_TEST_CASE(block_subsidy_test)
 {
-    const auto chainParams = CreateChainParams(*m_node.args, ChainType::MAIN);
-    TestBlockSubsidyHalvings(chainParams->GetConsensus()); // As in main
-    TestBlockSubsidyHalvings(150); // As in regtest
-    TestBlockSubsidyHalvings(1000); // Just another interval
+    const auto alphaParams = CreateChainParams(*m_node.args, ChainType::ALPHAMAIN);
+    const auto& params = alphaParams->GetConsensus();
+    // ALPHAMAIN: nSubsidyHalvingInterval = 1,050,000, nSignetActivationHeight = 450,000
+
+    bool saved_g_isAlpha = g_isAlpha;
+    g_isAlpha = true;
+
+    // Phase 1: 10 ALPHA per block
+    BOOST_CHECK_EQUAL(GetBlockSubsidy(0, params), 10 * COIN);
+    BOOST_CHECK_EQUAL(GetBlockSubsidy(1, params), 10 * COIN);
+    BOOST_CHECK_EQUAL(GetBlockSubsidy(399999, params), 10 * COIN);
+
+    // Single halving at block 400,000: 10 → 5 ALPHA
+    BOOST_CHECK_EQUAL(GetBlockSubsidy(400000, params), 5 * COIN);
+    BOOST_CHECK_EQUAL(GetBlockSubsidy(400001, params), 5 * COIN);
+    BOOST_CHECK_EQUAL(GetBlockSubsidy(449999, params), 5 * COIN);
+
+    // Signet fork at block 450,000: subsidy → 0
+    BOOST_CHECK_EQUAL(GetBlockSubsidy(450000, params), 0);
+    BOOST_CHECK_EQUAL(GetBlockSubsidy(450001, params), 0);
+    BOOST_CHECK_EQUAL(GetBlockSubsidy(1000000, params), 0);
+
+    // Overflow guard still works: halvings >= 64 at 64 * 1,050,000 = 67,200,000
+    BOOST_CHECK_EQUAL(GetBlockSubsidy(67200000, params), 0);
+
+    g_isAlpha = saved_g_isAlpha;
 }
 
+// Total mined supply matches the live Alpha network.
+// Phase 1 (blocks 0–399,999):       400,000 × 10 = 4,000,000 ALPHA
+// Phase 2 (blocks 400,000–449,999):   50,000 ×  5 =   250,000 ALPHA
+// Post-fork (blocks 450,000+):                    =         0 ALPHA
+// Total mined supply:                             = 4,250,000 ALPHA
+//
+// This is well within MAX_MONEY (21,000,000 ALPHA).
+// Cross-reference: Unicity explorer shows ~4,247,535 ALPHA circulating at
+// block ~449,513, consistent with 4,000,000 + 49,514 × 5 = 4,247,570.
 BOOST_AUTO_TEST_CASE(subsidy_limit_test)
 {
-    const auto chainParams = CreateChainParams(*m_node.args, ChainType::MAIN);
+    const auto alphaParams = CreateChainParams(*m_node.args, ChainType::ALPHAMAIN);
+    const auto& params = alphaParams->GetConsensus();
+
+    bool saved_g_isAlpha = g_isAlpha;
+    g_isAlpha = true;
+
     CAmount nSum = 0;
-    for (int nHeight = 0; nHeight < 14000000; nHeight += 1000) {
-        CAmount nSubsidy = GetBlockSubsidy(nHeight, chainParams->GetConsensus());
-        BOOST_CHECK(nSubsidy <= 50 * COIN);
-        nSum += nSubsidy * 1000;
-        BOOST_CHECK(MoneyRange(nSum));
+    for (int nHeight = 0; nHeight < 500000; nHeight++) {
+        CAmount nSubsidy = GetBlockSubsidy(nHeight, params);
+        BOOST_CHECK(nSubsidy <= 10 * COIN);
+        nSum += nSubsidy;
     }
-    BOOST_CHECK_EQUAL(nSum, CAmount{2099999997690000});
+
+    // Verify no more subsidy after the fork
+    BOOST_CHECK_EQUAL(GetBlockSubsidy(500000, params), 0);
+
+    // Total: 4,250,000 ALPHA
+    BOOST_CHECK_EQUAL(nSum, CAmount{4250000} * COIN);
+    BOOST_CHECK(MoneyRange(nSum));
+
+    g_isAlpha = saved_g_isAlpha;
 }
 
 BOOST_AUTO_TEST_CASE(signet_parse_tests)

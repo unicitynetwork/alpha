@@ -21,12 +21,20 @@
 #include <policy/policy.h>
 #include <pow.h>
 #include <primitives/transaction.h>
+#include <script/sign.h>
+#include <script/signingprovider.h>
+#include <signet.h>
+#include <streams.h>
 #include <util/moneystr.h>
 #include <util/time.h>
 #include <validation.h>
 
 #include <algorithm>
 #include <utility>
+
+// !ALPHA SIGNET FORK
+CKey g_alpha_signet_key;
+// !ALPHA SIGNET FORK END
 
 namespace node {
 int64_t UpdateTime(CBlockHeader* pblock, const Consensus::Params& consensusParams, const CBlockIndex* pindexPrev)
@@ -163,7 +171,14 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
     coinbaseTx.vin[0].prevout.SetNull();
     coinbaseTx.vout.resize(1);
     coinbaseTx.vout[0].scriptPubKey = scriptPubKeyIn;
-    coinbaseTx.vout[0].nValue = nFees + GetBlockSubsidy(nHeight, chainparams.GetConsensus());
+    // !ALPHA SIGNET FORK - Burn transaction fees: coinbase value is 0 post-fork
+    if (g_isAlpha && chainparams.GetConsensus().nSignetActivationHeight > 0 &&
+        nHeight >= chainparams.GetConsensus().nSignetActivationHeight) {
+        coinbaseTx.vout[0].nValue = 0;
+    } else {
+        coinbaseTx.vout[0].nValue = nFees + GetBlockSubsidy(nHeight, chainparams.GetConsensus());
+    }
+    // !ALPHA SIGNET FORK END
     coinbaseTx.vin[0].scriptSig = CScript() << nHeight << OP_0;
     pblock->vtx[0] = MakeTransactionRef(std::move(coinbaseTx));
     pblocktemplate->vchCoinbaseCommitment = m_chainstate.m_chainman.GenerateCoinbaseCommitment(*pblock, pindexPrev);
@@ -179,6 +194,89 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
     pblock->nBits          = GetNextWorkRequired(pindexPrev, pblock, chainparams.GetConsensus());
     pblock->nNonce         = 0;
     pblocktemplate->vTxSigOpsCost[0] = WITNESS_SCALE_FACTOR * GetLegacySigOpCount(*pblock->vtx[0]);
+
+    // !ALPHA SIGNET FORK - Sign block template for post-fork authorization
+    if (g_isAlpha && chainparams.GetConsensus().nSignetActivationHeight > 0
+        && nHeight >= chainparams.GetConsensus().nSignetActivationHeight) {
+
+        if (!g_alpha_signet_key.IsValid()) {
+            throw std::runtime_error("No signing key configured. Set -signetblockkey in alpha.conf to produce blocks.");
+        }
+
+        const Consensus::Params& cparams = chainparams.GetConsensus();
+        const CScript challenge(cparams.signet_challenge.begin(),
+                               cparams.signet_challenge.end());
+
+        int commitpos = GetWitnessCommitmentIndex(*pblock);
+        if (commitpos == NO_WITNESS_COMMITMENT) {
+            throw std::runtime_error(strprintf(
+                "%s: No witness commitment in block for signet signing at height %d", __func__, nHeight));
+        }
+
+        // Add an empty 4-byte SIGNET_HEADER placeholder to the coinbase
+        // witness commitment output BEFORE computing the signet merkle root.
+        // During verification, FetchAndClearCommitmentSection strips the
+        // solution but leaves this 4-byte placeholder, so the signing and
+        // verification merkle roots must both include it.
+        CScript savedScriptPubKey;
+        {
+            CMutableTransaction mtx(*pblock->vtx[0]);
+            savedScriptPubKey = mtx.vout[commitpos].scriptPubKey;
+            std::vector<uint8_t> empty_header(std::begin(SIGNET_HEADER), std::end(SIGNET_HEADER));
+            mtx.vout[commitpos].scriptPubKey << empty_header;
+            pblock->vtx[0] = MakeTransactionRef(std::move(mtx));
+        }
+
+        // Create the signet signing transaction pair
+        const std::optional<SignetTxs> signet_txs = SignetTxs::Create(*pblock, challenge);
+        if (!signet_txs) {
+            throw std::runtime_error(strprintf(
+                "%s: Failed to create signet transactions for signing at height %d", __func__, nHeight));
+        }
+
+        // Sign the spending transaction using the configured key
+        CMutableTransaction tx_signing(signet_txs->m_to_sign);
+
+        FlatSigningProvider keystore;
+        CKeyID keyid = g_alpha_signet_key.GetPubKey().GetID();
+        keystore.keys[keyid] = g_alpha_signet_key;
+        keystore.pubkeys[keyid] = g_alpha_signet_key.GetPubKey();
+
+        SignatureData sigdata;
+        bool signed_ok = ProduceSignature(keystore,
+            MutableTransactionSignatureCreator(tx_signing, /*nIn=*/0,
+                /*amount=*/signet_txs->m_to_spend.vout[0].nValue, SIGHASH_ALL),
+            challenge, sigdata);
+
+        if (!signed_ok) {
+            throw std::runtime_error(strprintf(
+                "%s: Failed to produce signet signature at height %d", __func__, nHeight));
+        }
+        UpdateInput(tx_signing.vin[0], sigdata);
+
+        // Serialize the signet solution: scriptSig || witness stack
+        std::vector<unsigned char> signet_solution;
+        VectorWriter writer{signet_solution, 0};
+        writer << tx_signing.vin[0].scriptSig;
+        writer << tx_signing.vin[0].scriptWitness.stack;
+
+        // Replace the placeholder with the full SIGNET_HEADER + solution.
+        // Restore the original scriptPubKey (without placeholder) then append
+        // the complete signet commitment pushdata.
+        CMutableTransaction mtx_coinbase(*pblock->vtx[0]);
+        mtx_coinbase.vout[commitpos].scriptPubKey = savedScriptPubKey;
+        std::vector<uint8_t> pushdata;
+        pushdata.insert(pushdata.end(), std::begin(SIGNET_HEADER), std::end(SIGNET_HEADER));
+        pushdata.insert(pushdata.end(), signet_solution.begin(), signet_solution.end());
+        mtx_coinbase.vout[commitpos].scriptPubKey << pushdata;
+        pblock->vtx[0] = MakeTransactionRef(std::move(mtx_coinbase));
+
+        // Recompute merkle root after modifying coinbase
+        pblock->hashMerkleRoot = BlockMerkleRoot(*pblock);
+
+        LogPrintf("CreateNewBlock(): signed block template for height %d\n", nHeight);
+    }
+    // !ALPHA SIGNET FORK END
 
     BlockValidationState state;
     if (m_options.test_block_validity && !TestBlockValidity(state, chainparams, m_chainstate, *pblock, pindexPrev,

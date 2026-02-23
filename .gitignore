@@ -166,3 +166,17 @@ dist/
 /ci/scratch/
 
 .vscode
+
+# Alpha mainnet signing keys
+.env
+.env.*
+
+# Claude Code project instructions
+CLAUDE.md
+
+# Local build artifacts and config
+build-output/
+config/
+
+# Claude artifacts
+CLAUDE.md

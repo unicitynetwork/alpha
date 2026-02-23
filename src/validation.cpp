@@ -1725,6 +1725,11 @@ CAmount GetBlockSubsidy(int nHeight, const Consensus::Params& consensusParams)
         nSubsidy = 50 * COIN;
 // !ALPHA END
 
+    // !ALPHA SIGNET FORK - Zero subsidy at activation height
+    if (g_isAlpha && nHeight >= consensusParams.nSignetActivationHeight && consensusParams.nSignetActivationHeight > 0)
+        return 0;
+    // !ALPHA SIGNET FORK END
+
     // Subsidy is cut in half every 210,000 blocks which will occur approximately every 4 years.
     // updated to force a single halving at block 400,000
     if (nHeight >= 400000)
@@ -2502,7 +2507,23 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
              Ticks<SecondsDouble>(time_connect),
              Ticks<MillisecondsDouble>(time_connect) / num_blocks_total);
 
+    // !ALPHA SIGNET FORK - Signet authorization check (belt-and-suspenders with ContextualCheckBlock)
+    if (g_isAlpha) {
+        if (!CheckSignetBlockSolution(block, params.GetConsensus(), pindex->nHeight)) {
+            LogPrintf("ERROR: ConnectBlock(): Alpha fork signet authorization failed at height %d\n", pindex->nHeight);
+            return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-alpha-blksig",
+                "Alpha fork: block authorization signature validation failure");
+        }
+    }
+    // !ALPHA SIGNET FORK END
+
     CAmount blockReward = nFees + GetBlockSubsidy(pindex->nHeight, params.GetConsensus());
+    // !ALPHA SIGNET FORK - Burn transaction fees: miner reward is 0 post-fork
+    if (g_isAlpha && params.GetConsensus().nSignetActivationHeight > 0 &&
+        pindex->nHeight >= params.GetConsensus().nSignetActivationHeight) {
+        blockReward = 0;
+    }
+    // !ALPHA SIGNET FORK END
     if (block.vtx[0]->GetValueOut() > blockReward) {
         LogPrintf("ERROR: ConnectBlock(): coinbase pays too much (actual=%d vs limit=%d)\n", block.vtx[0]->GetValueOut(), blockReward);
         return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-cb-amount");
@@ -3188,10 +3209,6 @@ bool Chainstate::ActivateBestChainStep(BlockValidationState& state, CBlockIndex*
     bool fContinue = true;
     int nHeight = pindexFork ? pindexFork->nHeight : -1;
     
-    //Shut down to force recompilation
-      if (nHeight == 450000)
-          return FatalError(m_chainman.GetNotifications(), state, "Forced shutdown at block 450,000. Get latest version");
-
     while (fContinue && nHeight != pindexMostWork->nHeight) {
         // Don't iterate the entire list of potential improvements toward the best tip, as we likely only need
         // a few blocks along the way.
@@ -4084,6 +4101,15 @@ static bool ContextualCheckBlock(const CBlock& block, BlockValidationState& stat
     if (!CheckWitnessMalleation(block, DeploymentActiveAfter(pindexPrev, chainman, Consensus::DEPLOYMENT_SEGWIT), state)) {
         return false;
     }
+
+    // !ALPHA SIGNET FORK - Height-gated signet authorization check
+    if (g_isAlpha) {
+        if (!CheckSignetBlockSolution(block, chainman.GetConsensus(), nHeight)) {
+            return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-alpha-blksig",
+                "Alpha fork: block authorization signature validation failure");
+        }
+    }
+    // !ALPHA SIGNET FORK END
 
     // After the coinbase witness reserved value and commitment are verified,
     // we can check if the block weight passes (before we've checked the

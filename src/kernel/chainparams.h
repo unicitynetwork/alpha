@@ -170,8 +170,16 @@ public:
     // !SCASH END
     
     // !ALPHA
-    static std::unique_ptr<const CChainParams> AlphaRegTest(const RegTestOptions& options);
-    static std::unique_ptr<const CChainParams> AlphaTestNet();
+
+    // !ALPHA SIGNET FORK
+    struct AlphaSignetForkOptions {
+        std::optional<int> fork_height{};
+        std::optional<std::vector<std::string>> pubkeys_hex{};
+    };
+    // !ALPHA SIGNET FORK END
+
+    static std::unique_ptr<const CChainParams> AlphaRegTest(const RegTestOptions& options, const AlphaSignetForkOptions& fork_options);
+    static std::unique_ptr<const CChainParams> AlphaTestNet(const AlphaSignetForkOptions& fork_options);
     static std::unique_ptr<const CChainParams> AlphaMain();
     // !ALPHA END
 

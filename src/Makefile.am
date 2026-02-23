@@ -227,6 +227,7 @@ BITCOIN_CORE_H = \
   node/mempool_args.h \
   node/mempool_persist_args.h \
   node/miner.h \
+  node/mining_thread.h \
   node/mini_miner.h \
   node/minisketchwrapper.h \
   node/peerman_args.h \
@@ -429,6 +430,7 @@ libbitcoin_node_a_SOURCES = \
   node/mempool_args.cpp \
   node/mempool_persist_args.cpp \
   node/miner.cpp \
+  node/mining_thread.cpp \
   node/mini_miner.cpp \
   node/minisketchwrapper.cpp \
   node/peerman_args.cpp \

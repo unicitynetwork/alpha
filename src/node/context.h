@@ -33,6 +33,7 @@ class WalletLoader;
 } // namespace interfaces
 
 namespace node {
+struct MiningContext;
 class KernelNotifications;
 
 //! NodeContext struct containing references to chain state and connection
@@ -71,6 +72,8 @@ struct NodeContext {
     std::unique_ptr<CScheduler> scheduler;
     std::function<void()> rpc_interruption_point = [] {};
     std::unique_ptr<KernelNotifications> notifications;
+    //! Background mining thread context (activated by -mine flag)
+    std::unique_ptr<MiningContext> mining_ctx;
     std::atomic<int> exit_status{EXIT_SUCCESS};
 
     //! Declare default constructor and destructor that are not inline, so code
